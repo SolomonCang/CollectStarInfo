@@ -1,6 +1,7 @@
 # Environment and secrets
 .env
 .venv/
+.gitignore
 
 # Python cache/build artifacts
 __pycache__/
@@ -22,3 +23,6 @@ results/
 .DS_Store
 .vscode/
 .idea/
+
+# API keys and secrets (if any were accidentally committed)
+*.key

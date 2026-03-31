@@ -23,6 +23,40 @@
 
 提示：如果只想跑单个目标，可用 `--targets "Proxima Centauri"` 直接传参。
 
+## 在 Copilot 中使用参数提取技能
+
+仓库内提供了一个可直接调用的 Copilot Skill：
+- `.github/skills/stellar-rotation-activity-params/SKILL.md`
+
+适用场景：
+- 你已经有 `results/<target>.json`，希望从 `target.simbad.references` 里继续追踪文献参数。
+- 需要重点提取以下参数：`Period`、`Mass`、`Teff`、`log g`、`vsini`、`RV`、`INCL`、`<Bl>`。
+- 希望将参数提取结果写到独立文件 `<target>_extrapar+.md`，而不覆盖原始目标报告。
+
+在 Copilot Chat 里的典型请求方式：
+- `使用 stellar-rotation-activity-params 技能分析 results/KIC 4931738.json，优先 Period, vsini, RV, INCL, <Bl>。`
+- `使用 stellar-rotation-activity-params 技能，下载文献资产到 results/KIC 4931738/，并生成 results/KIC 4931738_extrapar+.md。`
+
+如果你想先离线生成“文献追踪清单”，可直接运行技能附带脚本：
+
+```bash
+python .github/skills/stellar-rotation-activity-params/scripts/prepare_reference_hunt.py \
+   "results/KIC 4931738.json" \
+   --top 10 \
+   --parameters Period vsini RV INCL "<Bl>"
+```
+
+生成独立参数 Markdown（并可选下载 ADS/VizieR/arXiv 资产）：
+
+```bash
+python .github/skills/stellar-rotation-activity-params/scripts/prepare_reference_hunt.py \
+   "results/KIC 4931738.json" \
+   --write-extrapar-markdown \
+   --download-assets
+```
+
+说明：默认会在 JSON 同目录输出 `results/<target>_extrapar+.md`，并在 `results/<target>/` 下保存下载资产（可用 `--output-markdown` 与 `--asset-dir` 覆盖）。
+
 A Python agent-style tool for astronomy target lookup and summarization.
 
 ## Features
