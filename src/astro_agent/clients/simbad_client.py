@@ -358,10 +358,12 @@ class SimbadClient:
 
         return SimbadRecord(
             object_name=object_name,
-            object_type=(str(object_type).strip() if object_type is not None and str(object_type).strip() else None),
+            object_type=(str(object_type).strip() if object_type is not None
+                         and str(object_type).strip() else None),
             ra_deg=self._parse_ra_deg(ra),
             dec_deg=self._parse_dec_deg(dec),
-            spectral_type=(str(sp_type).strip() if sp_type is not None and str(sp_type).strip() else None),
+            spectral_type=(str(sp_type).strip() if sp_type is not None
+                           and str(sp_type).strip() else None),
             gaia_source_id=gaia_source_id,
             gaia_gmag=gmag_value,
             gaia_parallax_mas=parallax_mas,
@@ -385,8 +387,7 @@ class SimbadClient:
 
     @staticmethod
     def extract_gaia_source_id_from_identifiers(
-        identifiers: list[str],
-    ) -> str | None:
+        identifiers: list[str], ) -> str | None:
 
         for identifier in identifiers:
             upper = identifier.upper()

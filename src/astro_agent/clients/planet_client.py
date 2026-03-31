@@ -128,12 +128,15 @@ class PlanetClient:
             semi_major_axis_au=self._to_float(row.get("pl_orbsmax")),
             equilibrium_temp_k=self._to_float(row.get("pl_eqt")),
             insolation_flux_earth=self._to_float(row.get("pl_insol")),
-            discovery_method=(str(row.get("discoverymethod") or "").strip() or None),
+            discovery_method=(str(row.get("discoverymethod") or "").strip()
+                              or None),
             discovery_year=self._to_int(row.get("disc_year")),
-            discovery_facility=(str(row.get("disc_facility") or "").strip() or None),
+            discovery_facility=(str(row.get("disc_facility") or "").strip()
+                                or None),
         )
 
-    def _request(self, query: str, output_format: str) -> requests.Response | None:
+    def _request(self, query: str,
+                 output_format: str) -> requests.Response | None:
         response = None
         for attempt in range(self._max_retries):
             try:
@@ -156,13 +159,16 @@ class PlanetClient:
         return response
 
     @staticmethod
-    def _extract_reference_link(html: str) -> tuple[str | None, str | None, str | None]:
+    def _extract_reference_link(
+            html: str) -> tuple[str | None, str | None, str | None]:
         if not html:
             return None, None, None
 
         href_match = re.search(r'href=([^\s>]+)', html, flags=re.IGNORECASE)
         label_match = re.search(r'>([^<]+)</a>', html, flags=re.IGNORECASE)
-        bibcode_match = re.search(r'/abs/([^/]+)/abstract', html, flags=re.IGNORECASE)
+        bibcode_match = re.search(r'/abs/([^/]+)/abstract',
+                                  html,
+                                  flags=re.IGNORECASE)
 
         href = href_match.group(1).strip('"\'') if href_match else None
         label = label_match.group(1).strip() if label_match else None
@@ -188,8 +194,7 @@ class PlanetClient:
         query = (
             "SELECT TOP 1 pl_name, hostname, pl_refname, disc_refname, st_refname, sy_refname "
             "FROM ps "
-            f"WHERE lower(replace(pl_name, ' ', '')) = '{escaped}'"
-        )
+            f"WHERE lower(replace(pl_name, ' ', '')) = '{escaped}'")
 
         response = self._request(query=query, output_format="json")
         if response is None or not response.ok:
@@ -209,7 +214,8 @@ class PlanetClient:
 
         references: list[dict[str, str | list[str]]] = []
         seen_keys: set[str] = set()
-        for field_name in ("pl_refname", "disc_refname", "st_refname", "sy_refname"):
+        for field_name in ("pl_refname", "disc_refname", "st_refname",
+                           "sy_refname"):
             raw_value = str(row.get(field_name) or "").strip()
             if not raw_value:
                 continue

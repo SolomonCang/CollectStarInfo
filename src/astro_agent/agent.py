@@ -278,14 +278,16 @@ class TargetInfoAgent:
     @staticmethod
     def _reference_text(reference: dict[str, Any]) -> str:
         parts: list[str] = []
-        for key in ("bibcode", "title", "abstract", "journal", "reference_role"):
+        for key in ("bibcode", "title", "abstract", "journal",
+                    "reference_role"):
             value = str(reference.get(key) or "").strip()
             if value:
                 parts.append(value)
 
         keywords = reference.get("keywords")
         if isinstance(keywords, list):
-            parts.extend(str(item).strip() for item in keywords if str(item).strip())
+            parts.extend(
+                str(item).strip() for item in keywords if str(item).strip())
 
         return " ".join(parts)
 
@@ -307,12 +309,12 @@ class TargetInfoAgent:
                 continue
             if host_term and host_term in normalized_text:
                 if any(keyword in normalized_text for keyword in (
-                    "planet",
-                    "exoplanet",
-                    "transit",
-                    "atmosphere",
-                    "habitable",
-                    "biosignature",
+                        "planet",
+                        "exoplanet",
+                        "transit",
+                        "atmosphere",
+                        "habitable",
+                        "biosignature",
                 )):
                     focused.append(reference)
         return focused
@@ -326,7 +328,9 @@ class TargetInfoAgent:
         seen: set[str] = set()
         for collection in (primary, secondary):
             for reference in collection:
-                key = str(reference.get("bibcode") or reference.get("title") or reference).strip().lower()
+                key = str(
+                    reference.get("bibcode") or reference.get("title")
+                    or reference).strip().lower()
                 if not key or key in seen:
                     continue
                 seen.add(key)
@@ -569,7 +573,8 @@ class TargetInfoAgent:
                 else:
                     print("[module] done Planet archive refs (no match)")
             except Exception as exc:
-                result.notes.append(f"Planet archive reference query failed: {exc}")
+                result.notes.append(
+                    f"Planet archive reference query failed: {exc}")
                 archive_references = []
                 print(f"[module] done Planet archive refs (failed: {exc})")
 
@@ -693,7 +698,9 @@ class TargetInfoAgent:
                 )
                 print("[module] done LiteratureWorkflow")
             else:
-                print("[module] skip LiteratureWorkflow (no focused planet refs)")
+                print(
+                    "[module] skip LiteratureWorkflow (no focused planet refs)"
+                )
                 result.notes.append(
                     "Literature workflow skipped: no planet-focused references found from host SIMBAD or NASA Exoplanet Archive"
                 )
