@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import re
 from typing import Any
 
-from astropy.coordinates import Angle
+from astropy.coordinates import Angle, SkyCoord
 import astropy.units as u
 from astroquery.simbad import Simbad
 
@@ -285,46 +285,12 @@ class SimbadClient:
 
         return []
 
-    def query(self, target: str) -> SimbadRecord | None:
-        table = None
-        query_name = target
-        candidates = self._target_name_variants(target)
-        for candidate in candidates:
-            table = self._query_object_with_fallbacks(
-                (self._simbad, self._fallback_simbad), candidate)
-            if table is not None and len(table) > 0:
-                query_name = candidate
-                break
-
-        if table is None or len(table) == 0:
-            for candidate in candidates:
-                try:
-                    ids_table = self._simbad.query_objectids(candidate)
-                except Exception:
-                    continue
-
-                if ids_table is None or len(ids_table) == 0:
-                    continue
-
-                colname = ids_table.colnames[0]
-                for row in ids_table:
-                    identifier = str(row[colname]).strip()
-                    if not identifier:
-                        continue
-                    table = self._query_object_with_fallbacks(
-                        (self._simbad, self._fallback_simbad), identifier)
-                    if table is not None and len(table) > 0:
-                        query_name = identifier
-                        break
-
-                if table is not None and len(table) > 0:
-                    break
-
-        if table is None or len(table) == 0:
-            return None
-
-        row = table[0]
-
+    def _record_from_row(
+        self,
+        row: Any,
+        target: str,
+        query_name: str,
+    ) -> SimbadRecord:
         ra = _find_col(row, "RA_d", "RA")
         dec = _find_col(row, "DEC_d", "DEC")
         sp_type = _find_col(row, "SP_TYPE")
@@ -374,6 +340,94 @@ class SimbadClient:
             references=references,
         )
 
+    def query_region(
+        self,
+        coordinates: SkyCoord,
+        radius_arcsec: float = 5.0,
+    ) -> SimbadRecord | None:
+        table = None
+        for client in (self._simbad, self._fallback_simbad):
+            try:
+                table = client.query_region(
+                    coordinates,
+                    radius=radius_arcsec * u.arcsec,
+                )
+            except Exception:
+                continue
+            if table is not None and len(table) > 0:
+                break
+
+        if table is None or len(table) == 0:
+            return None
+
+        nearest_row = None
+        nearest_separation = None
+        for row in table:
+            row_ra = self._parse_ra_deg(_find_col(row, "RA_d", "RA"))
+            row_dec = self._parse_dec_deg(_find_col(row, "DEC_d", "DEC"))
+            if row_ra is None or row_dec is None:
+                continue
+            row_coord = SkyCoord(ra=row_ra * u.deg,
+                                 dec=row_dec * u.deg,
+                                 frame="icrs")
+            separation = coordinates.separation(row_coord)
+            if nearest_separation is None or separation < nearest_separation:
+                nearest_row = row
+                nearest_separation = separation
+
+        if nearest_row is None:
+            nearest_row = table[0]
+
+        main_id = _find_col(nearest_row, "MAIN_ID")
+        query_name = str(main_id).strip(
+        ) if main_id is not None else coordinates.to_string("hmsdms")
+        return self._record_from_row(
+            nearest_row,
+            target=query_name,
+            query_name=query_name,
+        )
+
+    def query(self, target: str) -> SimbadRecord | None:
+        table = None
+        query_name = target
+        candidates = self._target_name_variants(target)
+        for candidate in candidates:
+            table = self._query_object_with_fallbacks(
+                (self._simbad, self._fallback_simbad), candidate)
+            if table is not None and len(table) > 0:
+                query_name = candidate
+                break
+
+        if table is None or len(table) == 0:
+            for candidate in candidates:
+                try:
+                    ids_table = self._simbad.query_objectids(candidate)
+                except Exception:
+                    continue
+
+                if ids_table is None or len(ids_table) == 0:
+                    continue
+
+                colname = ids_table.colnames[0]
+                for row in ids_table:
+                    identifier = str(row[colname]).strip()
+                    if not identifier:
+                        continue
+                    table = self._query_object_with_fallbacks(
+                        (self._simbad, self._fallback_simbad), identifier)
+                    if table is not None and len(table) > 0:
+                        query_name = identifier
+                        break
+
+                if table is not None and len(table) > 0:
+                    break
+
+        if table is None or len(table) == 0:
+            return None
+
+        row = table[0]
+        return self._record_from_row(row, target=target, query_name=query_name)
+
     @staticmethod
     def extract_gaia_source_id(record: SimbadRecord | None) -> str | None:
         if record is None:
@@ -387,7 +441,7 @@ class SimbadClient:
 
     @staticmethod
     def extract_gaia_source_id_from_identifiers(
-        identifiers: list[str], ) -> str | None:
+            identifiers: list[str]) -> str | None:
 
         for identifier in identifiers:
             upper = identifier.upper()

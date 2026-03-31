@@ -139,9 +139,14 @@ class GaiaClient:
             return None
         return self._to_gaia_record(table[0])
 
-    def query_by_position(self, ra_deg: float,
-                          dec_deg: float) -> GaiaRecord | None:
-        radius = u.Quantity(self._cone_radius_arcsec, u.Unit("arcsec"))
+    def query_by_position(
+        self,
+        ra_deg: float,
+        dec_deg: float,
+        radius_arcsec: float | None = None,
+    ) -> GaiaRecord | None:
+        radius_value = self._cone_radius_arcsec if radius_arcsec is None else radius_arcsec
+        radius = u.Quantity(radius_value, u.Unit("arcsec"))
         query = f"""
             SELECT TOP 1 source_id, phot_g_mean_mag, parallax, parallax_error,
                    DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', {ra_deg}, {dec_deg})) AS dist

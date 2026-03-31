@@ -8,6 +8,7 @@ from .clients.gaia_client import GaiaClient
 from .clients.mast_client import MastClient
 from .clients.planet_client import PlanetClient
 from .clients.simbad_client import SimbadClient
+from .coordinates import parse_coordinate_input
 from .models import LiteratureCategorySummary, LiteratureWorkflow, TargetResult
 
 _ANALYSIS_ORDER = ("keywords", "title", "abstract")
@@ -233,6 +234,7 @@ class TargetInfoAgent:
         mast_radius_deg: float = 0.02,
         simbad_reference_time_range: str = "all",
         literature_min_obj_freq: int = 3,
+        coordinate_match_radius_arcsec: float = 5.0,
         deepseek_client: DeepSeekClient | None = None,
     ) -> None:
         self._simbad = SimbadClient(
@@ -241,6 +243,7 @@ class TargetInfoAgent:
         self._mast = MastClient(region_radius_deg=mast_radius_deg)
         self._planet = PlanetClient()
         self._literature_min_obj_freq = max(0, int(literature_min_obj_freq))
+        self._coordinate_match_radius_arcsec = coordinate_match_radius_arcsec
         self._deepseek = deepseek_client
 
     @staticmethod
@@ -328,9 +331,9 @@ class TargetInfoAgent:
         seen: set[str] = set()
         for collection in (primary, secondary):
             for reference in collection:
-                key = str(
-                    reference.get("bibcode") or reference.get("title")
-                    or reference).strip().lower()
+                key_value = reference.get("bibcode") or reference.get(
+                    "title") or reference
+                key = str(key_value).strip().lower()
                 if not key or key in seen:
                     continue
                 seen.add(key)
@@ -523,23 +526,119 @@ class TargetInfoAgent:
     def run_target(self, target: str, use_llm: bool = True) -> TargetResult:
         print(f"[target] {target}")
         print("[module] classify target")
-        print("[module] start SIMBAD")
         result = TargetResult(target=target)
+        working_target = target
+        simbad = None
 
-        try:
-            simbad = self._simbad.query(target)
-            result.simbad = simbad
-            if simbad is None:
-                result.notes.append("SIMBAD query returned no match")
-                print("[module] done SIMBAD (no match)")
-            else:
-                print("[module] done SIMBAD (ok)")
-        except Exception as exc:
-            result.notes.append(f"SIMBAD query failed: {exc}")
-            simbad = None
-            print(f"[module] done SIMBAD (failed: {exc})")
+        parsed_coordinates = parse_coordinate_input(target)
+        if parsed_coordinates is not None:
+            result.input_kind = "coordinates"
+            print("[module] start coordinate resolution")
+            result.notes.append(
+                "Coordinate input detected: "
+                f"{parsed_coordinates.format_name} -> "
+                f"RA={parsed_coordinates.skycoord.ra.deg:.6f} deg, "
+                f"Dec={parsed_coordinates.skycoord.dec.deg:.6f} deg")
+            try:
+                radius_candidates: list[float] = []
+                for radius in (
+                        self._coordinate_match_radius_arcsec,
+                        max(self._coordinate_match_radius_arcsec, 30.0),
+                        max(self._coordinate_match_radius_arcsec, 120.0),
+                ):
+                    if radius not in radius_candidates:
+                        radius_candidates.append(radius)
 
-        result.target_type = self._infer_target_type(target, simbad)
+                matched_radius = radius_candidates[-1]
+                print("[module] start Gaia coordinate fallback")
+                gaia_match = None
+                gaia_match_radius = radius_candidates[-1]
+                for radius_arcsec in radius_candidates:
+                    gaia_match = self._gaia.query_by_position(
+                        parsed_coordinates.skycoord.ra.deg,
+                        parsed_coordinates.skycoord.dec.deg,
+                        radius_arcsec=radius_arcsec,
+                    )
+                    if gaia_match is not None and gaia_match.source_id:
+                        gaia_match_radius = radius_arcsec
+                        break
+
+                if gaia_match is not None and gaia_match.source_id:
+                    gaia_identifier = f"Gaia DR3 {gaia_match.source_id}"
+                    simbad = self._simbad.query(gaia_identifier)
+                    if simbad is not None:
+                        matched_radius = gaia_match_radius
+                        result.notes.append(
+                            "Coordinate Gaia fallback matched source id "
+                            f"{gaia_match.source_id} within {gaia_match_radius:.1f} arcsec"
+                        )
+                        print("[module] done Gaia coordinate fallback (ok)")
+                    else:
+                        result.notes.append(
+                            "Coordinate Gaia fallback found source id "
+                            f"{gaia_match.source_id}, but SIMBAD name resolution returned no match"
+                        )
+                        print(
+                            "[module] done Gaia coordinate fallback (no SIMBAD match)"
+                        )
+                else:
+                    print("[module] done Gaia coordinate fallback (no match)")
+
+                if simbad is None:
+                    print("[module] start SIMBAD coordinate fallback")
+                    for radius_arcsec in radius_candidates:
+                        simbad = self._simbad.query_region(
+                            parsed_coordinates.skycoord,
+                            radius_arcsec=radius_arcsec,
+                        )
+                        if simbad is not None:
+                            matched_radius = radius_arcsec
+                            print(
+                                "[module] done SIMBAD coordinate fallback (ok)"
+                            )
+                            break
+                    if simbad is None:
+                        print(
+                            "[module] done SIMBAD coordinate fallback (no match)"
+                        )
+
+                result.simbad = simbad
+                if simbad is None:
+                    result.notes.append(
+                        "Coordinate resolution returned no SIMBAD match "
+                        f"within {radius_candidates[-1]:.1f} arcsec")
+                    print("[module] done coordinate resolution (no match)")
+                else:
+                    working_target = simbad.object_name
+                    result.resolved_target = working_target
+                    result.notes.append(
+                        f"Coordinate input resolved to SIMBAD object '{working_target}' "
+                        f"within {matched_radius:.1f} arcsec")
+                    print("[module] done coordinate resolution (ok)")
+            except Exception as exc:
+                result.notes.append(f"Coordinate resolution failed: {exc}")
+                print(f"[module] done coordinate resolution (failed: {exc})")
+
+        if simbad is None:
+            print("[module] start SIMBAD")
+            try:
+                simbad = self._simbad.query(working_target)
+                result.simbad = simbad
+                if simbad is None:
+                    result.notes.append("SIMBAD query returned no match")
+                    print("[module] done SIMBAD (no match)")
+                else:
+                    if result.resolved_target is None and working_target != target:
+                        result.resolved_target = working_target
+                    print("[module] done SIMBAD (ok)")
+            except Exception as exc:
+                result.notes.append(f"SIMBAD query failed: {exc}")
+                simbad = None
+                print(f"[module] done SIMBAD (failed: {exc})")
+        else:
+            print("[module] skip SIMBAD (already resolved from coordinates)")
+
+        result.target_type = self._infer_target_type(working_target, simbad)
         print(f"[module] target type: {result.target_type}")
 
         planet = None
@@ -547,7 +646,8 @@ class TargetInfoAgent:
         if result.target_type == "planet":
             print("[module] start Planet")
             try:
-                planet = self._planet.query(target=target, simbad=simbad)
+                planet = self._planet.query(target=working_target,
+                                            simbad=simbad)
                 result.planet = planet
                 if planet is None:
                     result.notes.append("Planet query returned no match")
@@ -562,7 +662,7 @@ class TargetInfoAgent:
             print("[module] start Planet archive refs")
             try:
                 archive_references = self._planet.query_references(
-                    target=target,
+                    target=working_target,
                     simbad=simbad,
                 )
                 if archive_references:
@@ -598,7 +698,8 @@ class TargetInfoAgent:
                 print(f"[module] done SIMBAD host fallback (failed: {exc})")
 
         if result.target_type == "planet" and stellar_anchor is None:
-            inferred_host = self._infer_host_name_from_planet_target(target)
+            inferred_host = self._infer_host_name_from_planet_target(
+                working_target)
             if inferred_host:
                 print("[module] start SIMBAD inferred-host fallback")
                 try:
@@ -667,7 +768,7 @@ class TargetInfoAgent:
         literature_source_counts: dict[str, int] = {}
         if result.target_type == "planet":
             focus_terms, focus_target = self._planet_focus_terms(
-                target=target,
+                target=working_target,
                 planet_name=None if planet is None else planet.planet_name,
                 host_name=None if planet is None else planet.host_name,
             )
@@ -718,7 +819,7 @@ class TargetInfoAgent:
             print("[module] start DeepSeek")
             try:
                 result.summary = self._deepseek.summarize(
-                    target,
+                    working_target,
                     result.target_type,
                     simbad,
                     gaia,

@@ -13,6 +13,7 @@
    - `pip install -r requirements.txt`
 2. 准备目标列表
    - 在 `targets_input.txt` 中每行写一个目标名（例如 `GJ 65A`、`AD Leo`）。
+   - 也可以直接写坐标，支持常见格式，例如 `217.428938 -62.679492` 或 `14:29:42.95 -62:40:46.2`。
 3. 直接运行查询（不使用 LLM，总结更稳定）
    - `python run_agent.py --targets-file targets_input.txt --format both --no-llm`
 4. 直接运行查询（启用 LLM 总结）
@@ -22,6 +23,7 @@
    - 结果默认写入 `results/`，每个目标会生成同名 `.json` 和 `.md` 报告。
 
 提示：如果只想跑单个目标，可用 `--targets "Proxima Centauri"` 直接传参。
+也可以直接传坐标，例如 `python run_agent.py --targets "14:29:42.95 -62:40:46.2" --no-llm`。
 
 ## 在 Copilot 中使用参数提取技能
 
@@ -61,6 +63,7 @@ A Python agent-style tool for astronomy target lookup and summarization.
 
 ## Features
 - Query SIMBAD for object match, coordinates, and spectral type.
+- Accept coordinate inputs, resolve the nearest SIMBAD object name, then continue with the normal stellar-target workflow.
 - Query Gaia DR3 for G magnitude, parallax, and estimated distance.
 - Extract TIC/EPIC/KIC IDs from SIMBAD identifiers and query NASA MAST for observation counts.
 - Summarize regional MAST archive coverage by mission (TESS, K2, Kepler, JWST, HST).
@@ -92,6 +95,10 @@ If no API key is provided, the tool still runs database lookup and skips LLM sum
 Run with comma-separated targets:
 
 python run_agent.py --targets "Proxima Centauri,AD Leo"
+
+Run with coordinates directly:
+
+python run_agent.py --targets "14:29:42.95 -62:40:46.2"
 
 Run with custom config file:
 

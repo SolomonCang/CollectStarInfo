@@ -51,10 +51,15 @@ def _summarize_reference_years(
 
 
 def _write_markdown(path: Path, item: TargetResult) -> None:
+    display_target = item.resolved_target or item.target
     lines: list[str] = ["# Astronomy Target Search Report", ""]
     lines.append(f"Generated at: {datetime.utcnow().isoformat()}Z")
     lines.append("")
-    lines.append(f"## {item.target}")
+    lines.append(f"## {display_target}")
+    if item.resolved_target is not None:
+        lines.append(f"- Query input: {item.target}")
+        lines.append(f"- Resolved target: {item.resolved_target}")
+        lines.append(f"- Input kind: {item.input_kind}")
     lines.append(f"- Target type: {item.target_type}")
     lines.append("")
 
@@ -204,10 +209,15 @@ def _write_markdown(path: Path, item: TargetResult) -> None:
 
 def _write_text(path: Path, item: TargetResult) -> None:
     # Plain-text output mirrors markdown content for easy viewing in terminals.
+    display_target = item.resolved_target or item.target
     lines: list[str] = ["Astronomy Target Search Report", ""]
     lines.append(f"Generated at: {datetime.utcnow().isoformat()}Z")
     lines.append("")
-    lines.append(f"Target: {item.target}")
+    lines.append(f"Target: {display_target}")
+    if item.resolved_target is not None:
+        lines.append(f"Query input: {item.target}")
+        lines.append(f"Resolved target: {item.resolved_target}")
+        lines.append(f"Input kind: {item.input_kind}")
     lines.append(f"Target type: {item.target_type}")
     lines.append("")
 

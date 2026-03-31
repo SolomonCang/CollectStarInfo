@@ -88,6 +88,8 @@ class LiteratureWorkflow:
 @dataclass
 class TargetResult:
     target: str
+    input_kind: str = "name"
+    resolved_target: str | None = None
     target_type: str = "unknown"
     simbad: SimbadRecord | None = None
     gaia: GaiaRecord | None = None
