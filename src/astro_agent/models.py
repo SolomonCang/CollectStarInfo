@@ -77,6 +77,8 @@ class LiteratureWorkflow:
     min_obj_freq: int = 0
     total_references: int = 0
     references_analyzed: int = 0
+    focus_target: str | None = None
+    reference_sources: dict[str, int] = field(default_factory=dict)
     observations: list[LiteratureCategorySummary] = field(default_factory=list)
     research_topics: list[LiteratureCategorySummary] = field(
         default_factory=list)

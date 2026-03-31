@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import re
 from typing import Any
 
+from astropy.coordinates import Angle
+import astropy.units as u
 from astroquery.simbad import Simbad
 
 from ..models import SimbadRecord
@@ -20,31 +22,37 @@ def _find_col(row, *candidates: str):
 
 class SimbadClient:
 
+    _BASE_VOTABLE_FIELDS = (
+        "ra",
+        "dec",
+        "sp",
+        "otype",
+        "ids",
+        "plx_value",
+        "plx_err",
+    )
+
     _SERVERS = (
         "simbad.cds.unistra.fr",
-        "simbad.u-strasbg.fr",
+        "simbad.harvard.edu",
     )
 
     def __init__(self, reference_time_range: str = "all") -> None:
-        self._simbad = self._build_resilient_simbad_client()
+        self._simbad = self._build_resilient_simbad_client(include_flux_g=True)
+        self._fallback_simbad = self._build_resilient_simbad_client(
+            include_flux_g=False)
         self._reference_time_range = reference_time_range
 
-    def _build_resilient_simbad_client(self) -> Simbad:
+    def _build_resilient_simbad_client(self, include_flux_g: bool) -> Simbad:
         last_error: Exception | None = None
         for server in self._SERVERS:
             try:
                 custom = Simbad()
                 custom.server = server
-                custom.add_votable_fields(
-                    "ra",
-                    "dec",
-                    "sp",
-                    "otype",
-                    "ids",
-                    "plx_value",
-                    "plx_err",
-                    "G",
-                )
+                fields = list(self._BASE_VOTABLE_FIELDS)
+                if include_flux_g:
+                    fields.append("G")
+                custom.add_votable_fields(*fields)
                 return custom
             except Exception as exc:
                 last_error = exc
@@ -57,6 +65,50 @@ class SimbadClient:
                 f"[SIMBAD] fallback to basic client (no extra fields): {last_error}"
             )
         return basic
+
+    @staticmethod
+    def _query_object_with_fallbacks(
+        clients: tuple[Simbad, ...],
+        candidate: str,
+    ):
+        for client in clients:
+            try:
+                table = client.query_object(candidate)
+            except Exception:
+                continue
+            if table is not None and len(table) > 0:
+                return table
+        return None
+
+    @staticmethod
+    def _parse_ra_deg(value: Any) -> float | None:
+        numeric = SimbadClient._to_float(value)
+        if numeric is not None:
+            return numeric
+
+        text = str(value).strip()
+        if not text or text == "--":
+            return None
+
+        try:
+            return float(Angle(text, unit=u.hourangle).degree)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_dec_deg(value: Any) -> float | None:
+        numeric = SimbadClient._to_float(value)
+        if numeric is not None:
+            return numeric
+
+        text = str(value).strip()
+        if not text or text == "--":
+            return None
+
+        try:
+            return float(Angle(text, unit=u.deg).degree)
+        except Exception:
+            return None
 
     @staticmethod
     def _normalize_target_name(target: str) -> str:
@@ -238,11 +290,8 @@ class SimbadClient:
         query_name = target
         candidates = self._target_name_variants(target)
         for candidate in candidates:
-            try:
-                table = self._simbad.query_object(candidate)
-            except Exception:
-                continue
-
+            table = self._query_object_with_fallbacks(
+                (self._simbad, self._fallback_simbad), candidate)
             if table is not None and len(table) > 0:
                 query_name = candidate
                 break
@@ -262,11 +311,8 @@ class SimbadClient:
                     identifier = str(row[colname]).strip()
                     if not identifier:
                         continue
-                    try:
-                        table = self._simbad.query_object(identifier)
-                    except Exception:
-                        continue
-
+                    table = self._query_object_with_fallbacks(
+                        (self._simbad, self._fallback_simbad), identifier)
                     if table is not None and len(table) > 0:
                         query_name = identifier
                         break
@@ -312,13 +358,10 @@ class SimbadClient:
 
         return SimbadRecord(
             object_name=object_name,
-            object_type=(str(object_type).strip() if object_type is not None
-                         and str(object_type).strip() else None),
-            ra_deg=float(ra) if ra is not None and str(ra) != "--" else None,
-            dec_deg=float(dec)
-            if dec is not None and str(dec) != "--" else None,
-            spectral_type=(str(sp_type).strip() if sp_type is not None
-                           and str(sp_type).strip() else None),
+            object_type=(str(object_type).strip() if object_type is not None and str(object_type).strip() else None),
+            ra_deg=self._parse_ra_deg(ra),
+            dec_deg=self._parse_dec_deg(dec),
+            spectral_type=(str(sp_type).strip() if sp_type is not None and str(sp_type).strip() else None),
             gaia_source_id=gaia_source_id,
             gaia_gmag=gmag_value,
             gaia_parallax_mas=parallax_mas,
@@ -342,7 +385,8 @@ class SimbadClient:
 
     @staticmethod
     def extract_gaia_source_id_from_identifiers(
-        identifiers: list[str], ) -> str | None:
+        identifiers: list[str],
+    ) -> str | None:
 
         for identifier in identifiers:
             upper = identifier.upper()

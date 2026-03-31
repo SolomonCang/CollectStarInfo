@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from io import StringIO
+import json
 import re
 import time
 
@@ -127,12 +128,115 @@ class PlanetClient:
             semi_major_axis_au=self._to_float(row.get("pl_orbsmax")),
             equilibrium_temp_k=self._to_float(row.get("pl_eqt")),
             insolation_flux_earth=self._to_float(row.get("pl_insol")),
-            discovery_method=(str(row.get("discoverymethod") or "").strip()
-                              or None),
+            discovery_method=(str(row.get("discoverymethod") or "").strip() or None),
             discovery_year=self._to_int(row.get("disc_year")),
-            discovery_facility=(str(row.get("disc_facility") or "").strip()
-                                or None),
+            discovery_facility=(str(row.get("disc_facility") or "").strip() or None),
         )
+
+    def _request(self, query: str, output_format: str) -> requests.Response | None:
+        response = None
+        for attempt in range(self._max_retries):
+            try:
+                response = requests.get(
+                    self._endpoint,
+                    params={
+                        "query": query,
+                        "format": output_format,
+                    },
+                    timeout=self._timeout_sec,
+                )
+                if response.ok:
+                    return response
+            except requests.RequestException:
+                response = None
+
+            if attempt < self._max_retries - 1:
+                time.sleep(1.0)
+
+        return response
+
+    @staticmethod
+    def _extract_reference_link(html: str) -> tuple[str | None, str | None, str | None]:
+        if not html:
+            return None, None, None
+
+        href_match = re.search(r'href=([^\s>]+)', html, flags=re.IGNORECASE)
+        label_match = re.search(r'>([^<]+)</a>', html, flags=re.IGNORECASE)
+        bibcode_match = re.search(r'/abs/([^/]+)/abstract', html, flags=re.IGNORECASE)
+
+        href = href_match.group(1).strip('"\'') if href_match else None
+        label = label_match.group(1).strip() if label_match else None
+        bibcode = bibcode_match.group(1).strip() if bibcode_match else None
+        return bibcode, label, href
+
+    @staticmethod
+    def _reference_role_label(field_name: str) -> str:
+        mapping = {
+            "pl_refname": "planet parameters",
+            "disc_refname": "discovery",
+            "st_refname": "stellar parameters",
+            "sy_refname": "system parameters",
+        }
+        return mapping.get(field_name, field_name)
+
+    def _query_archive_references_by_planet_name(
+        self,
+        planet_name: str,
+    ) -> list[dict[str, str | list[str]]]:
+        normalized = self._normalize_name_for_match(planet_name)
+        escaped = normalized.replace("'", "''")
+        query = (
+            "SELECT TOP 1 pl_name, hostname, pl_refname, disc_refname, st_refname, sy_refname "
+            "FROM ps "
+            f"WHERE lower(replace(pl_name, ' ', '')) = '{escaped}'"
+        )
+
+        response = self._request(query=query, output_format="json")
+        if response is None or not response.ok:
+            return []
+
+        try:
+            rows = json.loads(response.text)
+        except json.JSONDecodeError:
+            return []
+
+        if not isinstance(rows, list) or not rows:
+            return []
+
+        row = rows[0]
+        if not isinstance(row, dict):
+            return []
+
+        references: list[dict[str, str | list[str]]] = []
+        seen_keys: set[str] = set()
+        for field_name in ("pl_refname", "disc_refname", "st_refname", "sy_refname"):
+            raw_value = str(row.get(field_name) or "").strip()
+            if not raw_value:
+                continue
+
+            bibcode, label, href = self._extract_reference_link(raw_value)
+            ref_key = (bibcode or label or raw_value).strip().lower()
+            if not ref_key or ref_key in seen_keys:
+                continue
+            seen_keys.add(ref_key)
+
+            item: dict[str, str | list[str]] = {
+                "title": label or raw_value,
+                "journal": "NASA Exoplanet Archive",
+                "source_database": "NASA Exoplanet Archive",
+                "reference_role": self._reference_role_label(field_name),
+            }
+            if bibcode:
+                item["bibcode"] = bibcode
+                year_match = re.match(r'^(\d{4})', bibcode)
+                if year_match:
+                    item["year"] = year_match.group(1)
+            if href:
+                item["url"] = href
+
+            references.append(item)
+
+        return references
 
     def query(self, target: str,
               simbad: SimbadRecord | None) -> PlanetRecord | None:
@@ -141,3 +245,14 @@ class PlanetClient:
             if record is not None:
                 return record
         return None
+
+    def query_references(
+        self,
+        target: str,
+        simbad: SimbadRecord | None,
+    ) -> list[dict[str, str | list[str]]]:
+        for name in self._planet_name_variants(target, simbad):
+            references = self._query_archive_references_by_planet_name(name)
+            if references:
+                return references
+        return []

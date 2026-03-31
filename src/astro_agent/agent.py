@@ -244,6 +244,96 @@ class TargetInfoAgent:
         self._deepseek = deepseek_client
 
     @staticmethod
+    def _normalize_reference_text(text: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", text.lower())
+
+    def _planet_focus_terms(
+        self,
+        target: str,
+        planet_name: str | None,
+        host_name: str | None,
+    ) -> tuple[list[str], str | None]:
+        focus_target = planet_name or target
+        normalized_focus = self._normalize_reference_text(focus_target)
+        terms = [normalized_focus]
+
+        host = (host_name or "").strip()
+        if host:
+            compact_host = self._normalize_reference_text(host)
+            if compact_host:
+                for suffix in ("b", "c", "d", "e", "f", "g", "h"):
+                    candidate = f"{compact_host}{suffix}"
+                    if candidate not in terms:
+                        terms.append(candidate)
+
+        unique_terms: list[str] = []
+        seen: set[str] = set()
+        for item in terms:
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            unique_terms.append(item)
+        return unique_terms, focus_target
+
+    @staticmethod
+    def _reference_text(reference: dict[str, Any]) -> str:
+        parts: list[str] = []
+        for key in ("bibcode", "title", "abstract", "journal", "reference_role"):
+            value = str(reference.get(key) or "").strip()
+            if value:
+                parts.append(value)
+
+        keywords = reference.get("keywords")
+        if isinstance(keywords, list):
+            parts.extend(str(item).strip() for item in keywords if str(item).strip())
+
+        return " ".join(parts)
+
+    def _filter_references_for_planet_focus(
+        self,
+        references: list[dict[str, Any]],
+        focus_terms: list[str],
+        host_name: str | None,
+    ) -> list[dict[str, Any]]:
+        focused: list[dict[str, Any]] = []
+        host_term = self._normalize_reference_text(host_name or "")
+        for reference in references:
+            normalized_text = self._normalize_reference_text(
+                self._reference_text(reference))
+            if not normalized_text:
+                continue
+            if any(term in normalized_text for term in focus_terms):
+                focused.append(reference)
+                continue
+            if host_term and host_term in normalized_text:
+                if any(keyword in normalized_text for keyword in (
+                    "planet",
+                    "exoplanet",
+                    "transit",
+                    "atmosphere",
+                    "habitable",
+                    "biosignature",
+                )):
+                    focused.append(reference)
+        return focused
+
+    @staticmethod
+    def _merge_references(
+        primary: list[dict[str, Any]],
+        secondary: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        merged: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for collection in (primary, secondary):
+            for reference in collection:
+                key = str(reference.get("bibcode") or reference.get("title") or reference).strip().lower()
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                merged.append(reference)
+        return merged
+
+    @staticmethod
     def _name_looks_like_planet(target: str) -> bool:
         return bool(_PLANET_NAME_HINT_PATTERN.match(target.strip()))
 
@@ -373,23 +463,34 @@ class TargetInfoAgent:
                                         for item in workflow.observations[:5])
         research_summary = ", ".join(f"{item.category} ({item.count})"
                                      for item in workflow.research_topics[:5])
+        source_summary = ", ".join(
+            f"{name} ({count})"
+            for name, count in workflow.reference_sources.items())
 
         observation_text = observation_summary or "no clear observation class"
         research_text = research_summary or "no clear research theme"
+        source_text = source_summary or "unspecified sources"
         filter_text = "without obj_freq filtering"
         if workflow.min_obj_freq > 0:
             filter_text = (
                 f"with obj_freq >= {workflow.min_obj_freq} "
                 f"({workflow.references_analyzed}/{workflow.total_references} refs kept)"
             )
+        focus_text = ""
+        if workflow.focus_target:
+            focus_text = f" Focus target: {workflow.focus_target}."
         return ("Reference workflow prioritizes keywords, then title, then "
                 f"abstract {filter_text}. "
+                f"Reference sources: {source_text}."
+                f"{focus_text}"
                 f"Likely observation coverage: {observation_text}. "
                 f"Likely research coverage: {research_text}.")
 
     def _build_literature_workflow(
         self,
         references: list[dict[str, Any]],
+        focus_target: str | None = None,
+        reference_sources: dict[str, int] | None = None,
     ) -> LiteratureWorkflow | None:
         if not references:
             return None
@@ -407,6 +508,8 @@ class TargetInfoAgent:
             min_obj_freq=self._literature_min_obj_freq,
             total_references=len(references),
             references_analyzed=len(filtered_references),
+            focus_target=focus_target,
+            reference_sources=reference_sources or {},
             observations=observations,
             research_topics=research_topics,
         )
@@ -436,6 +539,7 @@ class TargetInfoAgent:
         print(f"[module] target type: {result.target_type}")
 
         planet = None
+        archive_references: list[dict[str, Any]] = []
         if result.target_type == "planet":
             print("[module] start Planet")
             try:
@@ -450,6 +554,24 @@ class TargetInfoAgent:
                 result.notes.append(f"Planet query failed: {exc}")
                 planet = None
                 print(f"[module] done Planet (failed: {exc})")
+
+            print("[module] start Planet archive refs")
+            try:
+                archive_references = self._planet.query_references(
+                    target=target,
+                    simbad=simbad,
+                )
+                if archive_references:
+                    result.notes.append(
+                        f"Using {len(archive_references)} references from NASA Exoplanet Archive"
+                    )
+                    print("[module] done Planet archive refs (ok)")
+                else:
+                    print("[module] done Planet archive refs (no match)")
+            except Exception as exc:
+                result.notes.append(f"Planet archive reference query failed: {exc}")
+                archive_references = []
+                print(f"[module] done Planet archive refs (failed: {exc})")
 
         stellar_anchor = simbad
         if result.target_type == "planet" and planet is not None and planet.host_name:
@@ -497,6 +619,12 @@ class TargetInfoAgent:
                         f"[module] done SIMBAD inferred-host fallback (failed: {exc})"
                     )
 
+        if result.target_type == "planet" and stellar_anchor is not None:
+            result.simbad = stellar_anchor
+            result.notes.append(
+                f"Planet target: SIMBAD section uses host star '{stellar_anchor.object_name}'"
+            )
+
         gaia = None
         if result.target_type == "planet" and stellar_anchor is None:
             print("[module] skip Gaia (no stellar anchor)")
@@ -531,10 +659,50 @@ class TargetInfoAgent:
             mast = None
             print(f"[module] done MAST (failed: {exc})")
 
-        if simbad is not None:
+        literature_source_counts: dict[str, int] = {}
+        if result.target_type == "planet":
+            focus_terms, focus_target = self._planet_focus_terms(
+                target=target,
+                planet_name=None if planet is None else planet.planet_name,
+                host_name=None if planet is None else planet.host_name,
+            )
+            host_references = [] if stellar_anchor is None else stellar_anchor.references
+            focused_host_references = self._filter_references_for_planet_focus(
+                references=host_references,
+                focus_terms=focus_terms,
+                host_name=None if planet is None else planet.host_name,
+            )
+            if focused_host_references:
+                literature_source_counts["SIMBAD-host-focused"] = len(
+                    focused_host_references)
+            if archive_references:
+                literature_source_counts["NASA Exoplanet Archive"] = len(
+                    archive_references)
+
+            combined_references = self._merge_references(
+                archive_references,
+                focused_host_references,
+            )
+
+            if combined_references:
+                print("[module] start LiteratureWorkflow")
+                result.literature_workflow = self._build_literature_workflow(
+                    combined_references,
+                    focus_target=focus_target,
+                    reference_sources=literature_source_counts,
+                )
+                print("[module] done LiteratureWorkflow")
+            else:
+                print("[module] skip LiteratureWorkflow (no focused planet refs)")
+                result.notes.append(
+                    "Literature workflow skipped: no planet-focused references found from host SIMBAD or NASA Exoplanet Archive"
+                )
+        elif simbad is not None:
             print("[module] start LiteratureWorkflow")
             result.literature_workflow = self._build_literature_workflow(
-                simbad.references)
+                simbad.references,
+                reference_sources={"SIMBAD": len(simbad.references)},
+            )
             print("[module] done LiteratureWorkflow")
         else:
             print("[module] skip LiteratureWorkflow (no SIMBAD record)")

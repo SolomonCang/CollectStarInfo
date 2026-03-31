@@ -30,7 +30,8 @@ def _write_json(path: Path, result: TargetResult) -> None:
 
 
 def _summarize_reference_years(
-    references: list[dict[str, str | list[str]]], ) -> list[tuple[str, int]]:
+    references: list[dict[str, str | list[str]]],
+) -> list[tuple[str, int]]:
     year_counts = Counter()
     for ref in references:
         raw_year = ref.get("year")
@@ -150,6 +151,14 @@ def _write_markdown(path: Path, item: TargetResult) -> None:
         lines.append(
             f"- References analyzed: {item.literature_workflow.references_analyzed}/{item.literature_workflow.total_references}"
         )
+        if item.literature_workflow.focus_target:
+            lines.append(
+                f"- Focus target: {item.literature_workflow.focus_target}")
+        if item.literature_workflow.reference_sources:
+            source_text = ", ".join(
+                f"{source}={count}"
+                for source, count in item.literature_workflow.reference_sources.items())
+            lines.append(f"- Reference sources: {source_text}")
         if item.literature_workflow.overview:
             lines.append(f"- Overview: {item.literature_workflow.overview}")
         if item.literature_workflow.observations:
@@ -288,8 +297,7 @@ def _write_text(path: Path, item: TargetResult) -> None:
 
 def build_parser(defaults) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=
-        "Astronomy target information search and summarization agent")
+        description="Astronomy target information search and summarization agent")
     default_targets = ",".join(defaults.default_targets)
     parser.add_argument("--targets",
                         type=str,
