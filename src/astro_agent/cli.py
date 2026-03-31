@@ -55,11 +55,13 @@ def _write_markdown(path: Path, item: TargetResult) -> None:
     lines.append(f"Generated at: {datetime.utcnow().isoformat()}Z")
     lines.append("")
     lines.append(f"## {item.target}")
+    lines.append(f"- Target type: {item.target_type}")
     lines.append("")
 
     if item.simbad is not None:
         lines.append("### SIMBAD")
         lines.append(f"- Object: {item.simbad.object_name}")
+        lines.append(f"- Object type: {item.simbad.object_type}")
         lines.append(f"- RA (deg): {item.simbad.ra_deg}")
         lines.append(f"- DEC (deg): {item.simbad.dec_deg}")
         lines.append(f"- Spectral type: {item.simbad.spectral_type}")
@@ -112,6 +114,29 @@ def _write_markdown(path: Path, item: TargetResult) -> None:
                 lines.append(f"  - {mission}: {count}{suffix}")
     else:
         lines.append("### MAST")
+        lines.append("- No result")
+
+    lines.append("")
+    if item.planet is not None:
+        lines.append("### Planet")
+        lines.append(f"- Planet name: {item.planet.planet_name}")
+        lines.append(f"- Host name: {item.planet.host_name}")
+        lines.append(
+            f"- Orbital period (days): {item.planet.orbital_period_days}")
+        lines.append(f"- Radius (R_earth): {item.planet.radius_earth}")
+        lines.append(f"- Mass (M_earth): {item.planet.mass_earth}")
+        lines.append(
+            f"- Semi-major axis (AU): {item.planet.semi_major_axis_au}")
+        lines.append(
+            f"- Equilibrium temperature (K): {item.planet.equilibrium_temp_k}")
+        lines.append(
+            f"- Insolation flux (S_earth): {item.planet.insolation_flux_earth}"
+        )
+        lines.append(f"- Discovery method: {item.planet.discovery_method}")
+        lines.append(f"- Discovery year: {item.planet.discovery_year}")
+        lines.append(f"- Discovery facility: {item.planet.discovery_facility}")
+    else:
+        lines.append("### Planet")
         lines.append("- No result")
 
     lines.append("")
@@ -175,11 +200,13 @@ def _write_text(path: Path, item: TargetResult) -> None:
     lines.append(f"Generated at: {datetime.utcnow().isoformat()}Z")
     lines.append("")
     lines.append(f"Target: {item.target}")
+    lines.append(f"Target type: {item.target_type}")
     lines.append("")
 
     if item.simbad is not None:
         lines.append("SIMBAD")
         lines.append(f"- Object: {item.simbad.object_name}")
+        lines.append(f"- Object type: {item.simbad.object_type}")
         lines.append(f"- RA (deg): {item.simbad.ra_deg}")
         lines.append(f"- DEC (deg): {item.simbad.dec_deg}")
         lines.append(f"- Spectral type: {item.simbad.spectral_type}")
@@ -224,6 +251,29 @@ def _write_text(path: Path, item: TargetResult) -> None:
         lines.append("- No result")
 
     lines.append("")
+    if item.planet is not None:
+        lines.append("Planet")
+        lines.append(f"- Planet name: {item.planet.planet_name}")
+        lines.append(f"- Host name: {item.planet.host_name}")
+        lines.append(
+            f"- Orbital period (days): {item.planet.orbital_period_days}")
+        lines.append(f"- Radius (R_earth): {item.planet.radius_earth}")
+        lines.append(f"- Mass (M_earth): {item.planet.mass_earth}")
+        lines.append(
+            f"- Semi-major axis (AU): {item.planet.semi_major_axis_au}")
+        lines.append(
+            f"- Equilibrium temperature (K): {item.planet.equilibrium_temp_k}")
+        lines.append(
+            f"- Insolation flux (S_earth): {item.planet.insolation_flux_earth}"
+        )
+        lines.append(f"- Discovery method: {item.planet.discovery_method}")
+        lines.append(f"- Discovery year: {item.planet.discovery_year}")
+        lines.append(f"- Discovery facility: {item.planet.discovery_facility}")
+    else:
+        lines.append("Planet")
+        lines.append("- No result")
+
+    lines.append("")
     lines.append("Summary")
     lines.append(item.summary or "- LLM summary skipped or unavailable")
 
@@ -239,7 +289,7 @@ def _write_text(path: Path, item: TargetResult) -> None:
 def build_parser(defaults) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=
-        "Astronomy target information search and summarization agent", )
+        "Astronomy target information search and summarization agent")
     default_targets = ",".join(defaults.default_targets)
     parser.add_argument("--targets",
                         type=str,

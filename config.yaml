@@ -6,8 +6,8 @@ deepseek:
 
 run:
   use_llm: true
-  targets: ["V374 Peg"]  # Example: ["Proxima Centauri", "AD Leo"]
-  targets_file: ""
+  targets: []  # Example: ["Proxima Centauri", "AD Leo"]
+  targets_file: "targets_input.txt"
 
 http:
   timeout_sec: 45

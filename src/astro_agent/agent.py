@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from typing import Any
+import re
 
 from .clients.deepseek_client import DeepSeekClient
 from .clients.gaia_client import GaiaClient
 from .clients.mast_client import MastClient
+from .clients.planet_client import PlanetClient
 from .clients.simbad_client import SimbadClient
 from .models import LiteratureCategorySummary, LiteratureWorkflow, TargetResult
 
@@ -217,6 +219,11 @@ _RESEARCH_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
 )
 
+_PLANET_NAME_HINT_PATTERN = re.compile(r".*\d[\s-]?[bcdefgh]$", re.IGNORECASE)
+_PLANET_OTYPE_HINTS = ("planet", "exoplanet", "pl")
+_PLANET_SUFFIX_PATTERN = re.compile(
+    r"^(?P<host>.+?)[\s-]?(?P<suffix>[bcdefgh])$", re.IGNORECASE)
+
 
 class TargetInfoAgent:
 
@@ -232,8 +239,45 @@ class TargetInfoAgent:
             reference_time_range=simbad_reference_time_range, )
         self._gaia = GaiaClient(cone_radius_arcsec=gaia_cone_radius_arcsec)
         self._mast = MastClient(region_radius_deg=mast_radius_deg)
+        self._planet = PlanetClient()
         self._literature_min_obj_freq = max(0, int(literature_min_obj_freq))
         self._deepseek = deepseek_client
+
+    @staticmethod
+    def _name_looks_like_planet(target: str) -> bool:
+        return bool(_PLANET_NAME_HINT_PATTERN.match(target.strip()))
+
+    @staticmethod
+    def _simbad_is_planet(simbad_object_type: str | None) -> bool:
+        if not simbad_object_type:
+            return False
+
+        normalized = simbad_object_type.strip().lower()
+        if normalized in _PLANET_OTYPE_HINTS:
+            return True
+
+        return "planet" in normalized
+
+    def _infer_target_type(self, target: str, simbad: Any) -> str:
+        if simbad is not None and self._simbad_is_planet(simbad.object_type):
+            return "planet"
+
+        if self._name_looks_like_planet(target):
+            return "planet"
+
+        if simbad is not None:
+            return "star"
+
+        return "unknown"
+
+    @staticmethod
+    def _infer_host_name_from_planet_target(target: str) -> str | None:
+        match = _PLANET_SUFFIX_PATTERN.match(target.strip())
+        if not match:
+            return None
+
+        host = match.group("host").strip()
+        return host or None
 
     @staticmethod
     def _reference_obj_freq(reference: dict[str, Any]) -> int | None:
@@ -371,6 +415,7 @@ class TargetInfoAgent:
 
     def run_target(self, target: str, use_llm: bool = True) -> TargetResult:
         print(f"[target] {target}")
+        print("[module] classify target")
         print("[module] start SIMBAD")
         result = TargetResult(target=target)
 
@@ -387,23 +432,94 @@ class TargetInfoAgent:
             simbad = None
             print(f"[module] done SIMBAD (failed: {exc})")
 
-        print("[module] start Gaia")
-        try:
-            gaia = self._gaia.query_with_simbad_priority(simbad)
-            result.gaia = gaia
-            if gaia is None:
-                result.notes.append("Gaia query returned no match")
-                print("[module] done Gaia (no match)")
-            else:
-                print("[module] done Gaia (ok)")
-        except Exception as exc:
-            result.notes.append(f"Gaia query failed: {exc}")
-            gaia = None
-            print(f"[module] done Gaia (failed: {exc})")
+        result.target_type = self._infer_target_type(target, simbad)
+        print(f"[module] target type: {result.target_type}")
+
+        planet = None
+        if result.target_type == "planet":
+            print("[module] start Planet")
+            try:
+                planet = self._planet.query(target=target, simbad=simbad)
+                result.planet = planet
+                if planet is None:
+                    result.notes.append("Planet query returned no match")
+                    print("[module] done Planet (no match)")
+                else:
+                    print("[module] done Planet (ok)")
+            except Exception as exc:
+                result.notes.append(f"Planet query failed: {exc}")
+                planet = None
+                print(f"[module] done Planet (failed: {exc})")
+
+        stellar_anchor = simbad
+        if result.target_type == "planet" and planet is not None and planet.host_name:
+            print("[module] start SIMBAD host fallback")
+            try:
+                host_simbad = self._simbad.query(planet.host_name)
+                if host_simbad is not None:
+                    stellar_anchor = host_simbad
+                    result.notes.append(
+                        f"Using host star '{planet.host_name}' for Gaia/MAST fallback"
+                    )
+                    print("[module] done SIMBAD host fallback (ok)")
+                else:
+                    result.notes.append(
+                        "SIMBAD host fallback returned no match")
+                    print("[module] done SIMBAD host fallback (no match)")
+            except Exception as exc:
+                result.notes.append(f"SIMBAD host fallback failed: {exc}")
+                print(f"[module] done SIMBAD host fallback (failed: {exc})")
+
+        if result.target_type == "planet" and stellar_anchor is None:
+            inferred_host = self._infer_host_name_from_planet_target(target)
+            if inferred_host:
+                print("[module] start SIMBAD inferred-host fallback")
+                try:
+                    inferred_host_simbad = self._simbad.query(inferred_host)
+                    if inferred_host_simbad is not None:
+                        stellar_anchor = inferred_host_simbad
+                        result.notes.append(
+                            f"Using inferred host '{inferred_host}' for Gaia/MAST fallback"
+                        )
+                        print(
+                            "[module] done SIMBAD inferred-host fallback (ok)")
+                    else:
+                        result.notes.append(
+                            f"SIMBAD inferred-host '{inferred_host}' returned no match"
+                        )
+                        print(
+                            "[module] done SIMBAD inferred-host fallback (no match)"
+                        )
+                except Exception as exc:
+                    result.notes.append(
+                        f"SIMBAD inferred-host fallback failed: {exc}")
+                    print(
+                        f"[module] done SIMBAD inferred-host fallback (failed: {exc})"
+                    )
+
+        gaia = None
+        if result.target_type == "planet" and stellar_anchor is None:
+            print("[module] skip Gaia (no stellar anchor)")
+            result.notes.append(
+                "Gaia skipped: no stellar anchor for planet target")
+        else:
+            print("[module] start Gaia")
+            try:
+                gaia = self._gaia.query_with_simbad_priority(stellar_anchor)
+                result.gaia = gaia
+                if gaia is None:
+                    result.notes.append("Gaia query returned no match")
+                    print("[module] done Gaia (no match)")
+                else:
+                    print("[module] done Gaia (ok)")
+            except Exception as exc:
+                result.notes.append(f"Gaia query failed: {exc}")
+                gaia = None
+                print(f"[module] done Gaia (failed: {exc})")
 
         print("[module] start MAST")
         try:
-            mast = self._mast.query(simbad)
+            mast = self._mast.query(stellar_anchor)
             result.mast = mast
             if mast is None:
                 result.notes.append("MAST query returned no match")
@@ -428,9 +544,11 @@ class TargetInfoAgent:
             try:
                 result.summary = self._deepseek.summarize(
                     target,
+                    result.target_type,
                     simbad,
                     gaia,
                     mast,
+                    planet,
                     result.literature_workflow,
                 )
                 print("[module] done DeepSeek (ok)")

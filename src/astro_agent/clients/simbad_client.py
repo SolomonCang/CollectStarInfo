@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Any
 
 from astroquery.simbad import Simbad
@@ -19,19 +20,89 @@ def _find_col(row, *candidates: str):
 
 class SimbadClient:
 
+    _SERVERS = (
+        "simbad.cds.unistra.fr",
+        "simbad.u-strasbg.fr",
+    )
+
     def __init__(self, reference_time_range: str = "all") -> None:
-        custom = Simbad()
-        custom.add_votable_fields(
-            "ra",
-            "dec",
-            "sp",
-            "ids",
-            "plx_value",
-            "plx_err",
-            "G",
-        )
-        self._simbad = custom
+        self._simbad = self._build_resilient_simbad_client()
         self._reference_time_range = reference_time_range
+
+    def _build_resilient_simbad_client(self) -> Simbad:
+        last_error: Exception | None = None
+        for server in self._SERVERS:
+            try:
+                custom = Simbad()
+                custom.server = server
+                custom.add_votable_fields(
+                    "ra",
+                    "dec",
+                    "sp",
+                    "otype",
+                    "ids",
+                    "plx_value",
+                    "plx_err",
+                    "G",
+                )
+                return custom
+            except Exception as exc:
+                last_error = exc
+                continue
+
+        # Final fallback: keep a basic client so queries can still proceed.
+        basic = Simbad()
+        if last_error is not None:
+            print(
+                f"[SIMBAD] fallback to basic client (no extra fields): {last_error}"
+            )
+        return basic
+
+    @staticmethod
+    def _normalize_target_name(target: str) -> str:
+        # Normalize common Unicode dashes and strip trailing punctuation.
+        text = target.strip()
+        text = (text.replace("\u2010", "-").replace("\u2011", "-").replace(
+            "\u2012", "-").replace("\u2013",
+                                   "-").replace("\u2014",
+                                                "-").replace("\u2212", "-"))
+        return text.rstrip("。.,;:!?")
+
+    @classmethod
+    def _target_name_variants(cls, target: str) -> list[str]:
+        normalized = cls._normalize_target_name(target)
+        variants = [normalized]
+
+        # Many exoplanets are indexed with an optional space before suffix.
+        space_variant = re.sub(r"(?<=\d)([bcdefgh])$",
+                               r" \1",
+                               normalized,
+                               flags=re.IGNORECASE)
+        if space_variant != normalized:
+            variants.append(space_variant)
+
+        hyphen_space_variant = re.sub(
+            r"(?<=\d)-([bcdefgh])$",
+            r" \1",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if hyphen_space_variant not in variants:
+            variants.append(hyphen_space_variant)
+
+        compact = re.sub(r"\s+", "", normalized)
+        if compact and compact not in variants:
+            variants.append(compact)
+
+        unique: list[str] = []
+        seen: set[str] = set()
+        for item in variants:
+            key = item.casefold().strip()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique.append(item.strip())
+        return unique
 
     @staticmethod
     def _to_float(value: Any) -> float | None:
@@ -163,7 +234,46 @@ class SimbadClient:
         return []
 
     def query(self, target: str) -> SimbadRecord | None:
-        table = self._simbad.query_object(target)
+        table = None
+        query_name = target
+        candidates = self._target_name_variants(target)
+        for candidate in candidates:
+            try:
+                table = self._simbad.query_object(candidate)
+            except Exception:
+                continue
+
+            if table is not None and len(table) > 0:
+                query_name = candidate
+                break
+
+        if table is None or len(table) == 0:
+            for candidate in candidates:
+                try:
+                    ids_table = self._simbad.query_objectids(candidate)
+                except Exception:
+                    continue
+
+                if ids_table is None or len(ids_table) == 0:
+                    continue
+
+                colname = ids_table.colnames[0]
+                for row in ids_table:
+                    identifier = str(row[colname]).strip()
+                    if not identifier:
+                        continue
+                    try:
+                        table = self._simbad.query_object(identifier)
+                    except Exception:
+                        continue
+
+                    if table is not None and len(table) > 0:
+                        query_name = identifier
+                        break
+
+                if table is not None and len(table) > 0:
+                    break
+
         if table is None or len(table) == 0:
             return None
 
@@ -172,6 +282,7 @@ class SimbadClient:
         ra = _find_col(row, "RA_d", "RA")
         dec = _find_col(row, "DEC_d", "DEC")
         sp_type = _find_col(row, "SP_TYPE")
+        object_type = _find_col(row, "OTYPE", "OTYPE_V")
         ids = _find_col(row, "IDS")
         main_id = _find_col(row, "MAIN_ID")
         parallax = _find_col(row, "PLX_VALUE", "PLX")
@@ -195,12 +306,14 @@ class SimbadClient:
             parallax_error_mas,
         )
         references = self._query_references(
-            target=target,
+            target=query_name,
             object_name=object_name,
         )
 
         return SimbadRecord(
             object_name=object_name,
+            object_type=(str(object_type).strip() if object_type is not None
+                         and str(object_type).strip() else None),
             ra_deg=float(ra) if ra is not None and str(ra) != "--" else None,
             dec_deg=float(dec)
             if dec is not None and str(dec) != "--" else None,

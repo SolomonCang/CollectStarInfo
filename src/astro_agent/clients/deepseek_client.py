@@ -5,7 +5,7 @@ import json
 
 import requests
 
-from ..models import GaiaRecord, LiteratureWorkflow, MastRecord, SimbadRecord
+from ..models import GaiaRecord, LiteratureWorkflow, MastRecord, PlanetRecord, SimbadRecord
 
 
 class DeepSeekClient:
@@ -28,9 +28,11 @@ class DeepSeekClient:
     def summarize(
         self,
         target: str,
+        target_type: str,
         simbad: SimbadRecord | None,
         gaia: GaiaRecord | None,
         mast: MastRecord | None,
+        planet: PlanetRecord | None,
         literature_workflow: LiteratureWorkflow | None,
     ) -> str:
         serialized_workflow = None
@@ -45,9 +47,11 @@ class DeepSeekClient:
             try:
                 return self._summarize_chunked(
                     target=target,
+                    target_type=target_type,
                     simbad=simbad,
                     gaia=gaia,
                     mast=mast,
+                    planet=planet,
                     literature_workflow=serialized_workflow,
                     compact_refs=compact_refs,
                 )
@@ -57,9 +61,11 @@ class DeepSeekClient:
 
         payload = self._build_payload(
             target=target,
+            target_type=target_type,
             simbad=simbad,
             gaia=gaia,
             mast=mast,
+            planet=planet,
             literature_workflow=serialized_workflow,
             references_for_llm=compact_refs,
         )
@@ -69,9 +75,11 @@ class DeepSeekClient:
     def _summarize_chunked(
         self,
         target: str,
+        target_type: str,
         simbad: SimbadRecord | None,
         gaia: GaiaRecord | None,
         mast: MastRecord | None,
+        planet: PlanetRecord | None,
         literature_workflow: dict[str, object] | None,
         compact_refs: list[dict[str, object]],
     ) -> str:
@@ -106,9 +114,11 @@ class DeepSeekClient:
 
         final_payload = self._build_payload(
             target=target,
+            target_type=target_type,
             simbad=simbad,
             gaia=gaia,
             mast=mast,
+            planet=planet,
             literature_workflow=literature_workflow,
             references_for_llm=[],
         )
@@ -180,15 +190,19 @@ class DeepSeekClient:
     def _build_payload(
         self,
         target: str,
+        target_type: str,
         simbad: SimbadRecord | None,
         gaia: GaiaRecord | None,
         mast: MastRecord | None,
+        planet: PlanetRecord | None,
         literature_workflow: dict[str, object] | None,
         references_for_llm: list[dict[str, object]],
     ) -> dict[str, object]:
         return {
             "target":
             target,
+            "target_type":
+            target_type,
             "simbad":
             self._compact_simbad_payload(
                 simbad=simbad,
@@ -198,6 +212,8 @@ class DeepSeekClient:
             None if gaia is None else asdict(gaia),
             "mast":
             None if mast is None else asdict(mast),
+            "planet":
+            None if planet is None else asdict(planet),
             "literature_workflow":
             literature_workflow,
         }
@@ -255,6 +271,7 @@ class DeepSeekClient:
 
         return {
             "object_name": simbad.object_name,
+            "object_type": simbad.object_type,
             "ra_deg": simbad.ra_deg,
             "dec_deg": simbad.dec_deg,
             "spectral_type": simbad.spectral_type,

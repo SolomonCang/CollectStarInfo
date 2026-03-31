@@ -7,6 +7,7 @@ from typing import Any
 @dataclass
 class SimbadRecord:
     object_name: str
+    object_type: str | None = None
     ra_deg: float | None = None
     dec_deg: float | None = None
     spectral_type: str | None = None
@@ -44,6 +45,21 @@ class MastRecord:
 
 
 @dataclass
+class PlanetRecord:
+    planet_name: str
+    host_name: str | None = None
+    orbital_period_days: float | None = None
+    radius_earth: float | None = None
+    mass_earth: float | None = None
+    semi_major_axis_au: float | None = None
+    equilibrium_temp_k: float | None = None
+    insolation_flux_earth: float | None = None
+    discovery_method: str | None = None
+    discovery_year: int | None = None
+    discovery_facility: str | None = None
+
+
+@dataclass
 class LiteratureCategorySummary:
     category: str
     count: int = 0
@@ -70,9 +86,11 @@ class LiteratureWorkflow:
 @dataclass
 class TargetResult:
     target: str
+    target_type: str = "unknown"
     simbad: SimbadRecord | None = None
     gaia: GaiaRecord | None = None
     mast: MastRecord | None = None
+    planet: PlanetRecord | None = None
     literature_workflow: LiteratureWorkflow | None = None
     summary: str | None = None
     notes: list[str] = field(default_factory=list)
