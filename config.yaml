@@ -6,12 +6,11 @@ deepseek:
 
 run:
   use_llm: true
-  targets: []  # Example: ["Proxima Centauri", "AD Leo"]
-  targets_file: "targets_input.txt"
-  dotenv_path: null  # Example: ".env"
+  targets: ["V374 Peg"]  # Example: ["Proxima Centauri", "AD Leo"]
+  targets_file: ""
 
 http:
-  timeout_sec: 120
+  timeout_sec: 45
 
 output:
   dir: "results"

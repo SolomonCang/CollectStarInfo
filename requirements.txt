@@ -2,5 +2,4 @@ astroquery>=0.4.8
 astropy>=6.0.0
 pandas>=2.2.0
 requests>=2.32.0
-python-dotenv>=1.0.1
 PyYAML>=6.0.2

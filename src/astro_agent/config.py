@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-from dotenv import load_dotenv
 
 try:
     import yaml
@@ -22,7 +19,6 @@ class Settings:
     default_use_llm: bool
     default_targets: list[str]
     default_targets_file: str | None
-    default_dotenv_path: str | None
     default_output_dir: str
     default_output_format: str
     default_gaia_cone_radius_arcsec: float
@@ -31,7 +27,6 @@ class Settings:
     default_literature_min_obj_freq: int
 
 
-DEFAULT_DOTENV = Path(".env")
 DEFAULT_CONFIG_YAML = Path("config.yaml")
 
 
@@ -118,40 +113,19 @@ def _yaml_get(mapping: dict[str, Any], *path: str) -> Any:
     return current
 
 
-def load_settings(
-    dotenv_path: str | None = None,
-    config_path: str | None = None,
-) -> Settings:
+def load_settings(config_path: str | None = None, ) -> Settings:
     yaml_path = Path(config_path) if config_path else DEFAULT_CONFIG_YAML
     yaml_config = _read_yaml_config(yaml_path)
 
-    configured_dotenv = _yaml_get(yaml_config, "run", "dotenv_path")
-    resolved_dotenv_path = dotenv_path
-    if resolved_dotenv_path is None and isinstance(configured_dotenv, str):
-        configured_text = configured_dotenv.strip()
-        if configured_text:
-            resolved_dotenv_path = configured_text
-
-    if resolved_dotenv_path:
-        load_dotenv(resolved_dotenv_path)
-    else:
-        load_dotenv(DEFAULT_DOTENV)
-
-    deepseek_api_key = _yaml_get(yaml_config, "deepseek",
-                                 "api_key") or os.getenv("DEEPSEEK_API_KEY")
+    deepseek_api_key = _as_optional_str(
+        _yaml_get(yaml_config, "deepseek", "api_key"), )
     raw_deepseek_base_url = _yaml_get(yaml_config, "deepseek", "base_url")
-    if raw_deepseek_base_url is None:
-        raw_deepseek_base_url = os.getenv("DEEPSEEK_BASE_URL")
     deepseek_base_url = _as_str(raw_deepseek_base_url,
                                 "https://api.deepseek.com/v1").rstrip("/")
     raw_deepseek_model = _yaml_get(yaml_config, "deepseek", "model")
-    if raw_deepseek_model is None:
-        raw_deepseek_model = os.getenv("DEEPSEEK_MODEL")
     deepseek_model = _as_str(raw_deepseek_model, "deepseek-chat")
 
     raw_timeout_sec = _yaml_get(yaml_config, "http", "timeout_sec")
-    if raw_timeout_sec is None:
-        raw_timeout_sec = os.getenv("HTTP_TIMEOUT_SEC")
     timeout_sec = _as_int(raw_timeout_sec, 45)
 
     default_use_llm = _as_bool(
@@ -166,12 +140,6 @@ def load_settings(
         text = str(default_targets_file_raw).strip()
         if text:
             default_targets_file = text
-
-    default_dotenv_path = None
-    if isinstance(configured_dotenv, str):
-        text = configured_dotenv.strip()
-        if text:
-            default_dotenv_path = text
 
     default_output_dir = _as_str(
         _yaml_get(yaml_config, "output", "dir"),
@@ -192,14 +160,13 @@ def load_settings(
         default_simbad_reference_time_range = "all"
 
     return Settings(
-        deepseek_api_key=_as_optional_str(deepseek_api_key),
+        deepseek_api_key=deepseek_api_key,
         deepseek_base_url=deepseek_base_url,
         deepseek_model=deepseek_model,
         timeout_sec=timeout_sec,
         default_use_llm=default_use_llm,
         default_targets=default_targets,
         default_targets_file=default_targets_file,
-        default_dotenv_path=default_dotenv_path,
         default_output_dir=default_output_dir,
         default_output_format=default_output_format,
         default_gaia_cone_radius_arcsec=_as_float(

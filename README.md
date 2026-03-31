@@ -1,5 +1,28 @@
 # CollectStarInfo
 
+## 中文使用说明
+
+这是一个用于批量检索恒星/天体信息的工具，会整合 SIMBAD、Gaia DR3、MAST 等数据源，并输出结构化报告。
+
+重点：可以直接运行 `run_agent.py`，无需额外封装脚本。
+
+配置方式：统一使用 `config.yaml`，不再使用环境变量文件。
+
+1. 安装依赖
+   - `python3 -m venv .venv && source .venv/bin/activate`
+   - `pip install -r requirements.txt`
+2. 准备目标列表
+   - 在 `targets_input.txt` 中每行写一个目标名（例如 `GJ 65A`、`AD Leo`）。
+3. 直接运行查询（不使用 LLM，总结更稳定）
+   - `python run_agent.py --targets-file targets_input.txt --format both --no-llm`
+4. 直接运行查询（启用 LLM 总结）
+   - 先在 `config.yaml` 中配置 DeepSeek API Key
+   - 再执行 `python run_agent.py --targets-file targets_input.txt --format both --use-llm`
+5. 查看输出
+   - 结果默认写入 `results/`，每个目标会生成同名 `.json` 和 `.md` 报告。
+
+提示：如果只想跑单个目标，可用 `--targets "Proxima Centauri"` 直接传参。
+
 A Python agent-style tool for astronomy target lookup and summarization.
 
 ## Features
@@ -19,18 +42,15 @@ A Python agent-style tool for astronomy target lookup and summarization.
    - pip install -r requirements.txt
 
 ## Configure DeepSeek (optional)
-1. Copy .env.example to .env
-2. Set DEEPSEEK_API_KEY in .env
+Set `deepseek.api_key` in `config.yaml`.
 
-You can also use `config.yaml` in project root to configure runtime parameters
+Use `config.yaml` in project root to configure runtime parameters
 (DeepSeek API, run switches, output defaults, and agent defaults).
-`config.yaml` values take priority over environment variables.
 
 Supported run switches in `config.yaml`:
 - `run.use_llm`: default LLM behavior
 - `run.targets`: default target list when `--targets` is omitted
 - `run.targets_file`: default targets file when `--targets-file` is omitted
-- `run.dotenv_path`: default dotenv file path
 
 If no API key is provided, the tool still runs database lookup and skips LLM summary.
 

@@ -269,10 +269,6 @@ def build_parser(defaults) -> argparse.ArgumentParser:
                         type=str,
                         default=None,
                         help="Custom config.yaml path")
-    parser.add_argument("--dotenv",
-                        type=str,
-                        default=defaults.default_dotenv_path,
-                        help="Custom .env path")
     parser.add_argument("--cone-radius-arcsec",
                         type=float,
                         default=defaults.default_gaia_cone_radius_arcsec,
@@ -302,13 +298,9 @@ def build_parser(defaults) -> argparse.ArgumentParser:
 def main() -> None:
     bootstrap_parser = argparse.ArgumentParser(add_help=False)
     bootstrap_parser.add_argument("--config", type=str, default=None)
-    bootstrap_parser.add_argument("--dotenv", type=str, default=None)
     bootstrap_args, _ = bootstrap_parser.parse_known_args()
 
-    defaults = load_settings(
-        dotenv_path=bootstrap_args.dotenv,
-        config_path=bootstrap_args.config,
-    )
+    defaults = load_settings(config_path=bootstrap_args.config, )
 
     parser = build_parser(defaults)
     args = parser.parse_args()
@@ -318,10 +310,7 @@ def main() -> None:
         raise ValueError(
             "No targets provided. Use --targets or --targets-file")
 
-    settings = load_settings(
-        dotenv_path=args.dotenv,
-        config_path=args.config,
-    )
+    settings = load_settings(config_path=args.config, )
 
     deepseek_client = None
     use_llm = args.use_llm
