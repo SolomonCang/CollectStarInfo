@@ -1,0 +1,24 @@
+deepseek:
+  api_key: "sk-3afda4dc405b461b89da34da3ed0e9bc"
+  base_url: "https://api.deepseek.com/v1"
+  model: "deepseek-chat"
+
+
+run:
+  use_llm: true
+  targets: []  # Example: ["Proxima Centauri", "AD Leo"]
+  targets_file: "targets_input.txt"
+  dotenv_path: null  # Example: ".env"
+
+http:
+  timeout_sec: 120
+
+output:
+  dir: "results"
+  format: "both"  # json | md | both
+
+agent:
+  gaia_cone_radius_arcsec: 5.0
+  mast_radius_deg: 0.02
+  simbad_reference_time_range: "all"  # all | recent10
+  literature_min_obj_freq: 3

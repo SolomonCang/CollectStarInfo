@@ -1,0 +1,27 @@
+AD Leo
+AU Mic
+BD 13 2618
+BD 61 195
+BX Ant
+CE Ant
+CN Leo
+DG CVn
+DN Tau
+DS Leo
+DT Vir
+DX Cnc
+EQ Peg
+EV Lac
+FK Aqr
+GJ 1243
+GJ 273
+GJ 65A
+GJ 65B
+HD 325367
+HK Aqr
+OT Ser
+Ross 154
+V374 Peg
+WX UMa
+Wolf 47
+YZ CMi

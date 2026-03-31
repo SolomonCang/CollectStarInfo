@@ -1,0 +1,24 @@
+# Environment and secrets
+.env
+.venv/
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+
+# Local outputs
+results/
+*.log
+
+# OS/editor local files
+.DS_Store
+.vscode/
+.idea/
