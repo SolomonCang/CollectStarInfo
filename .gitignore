@@ -26,3 +26,5 @@ results/
 
 # API keys and secrets (if any were accidentally committed)
 *.key
+start_agent_with_key.py
+src/astro_agent/key_sync.py
