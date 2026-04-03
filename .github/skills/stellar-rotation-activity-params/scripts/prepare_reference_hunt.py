@@ -70,6 +70,7 @@ JOURNAL_PREFIXES: tuple[tuple[str, str], ...] = (
 )
 
 USER_AGENT = "Mozilla/5.0 (compatible; TargetInfoSearch/1.0)"
+DEFAULT_ASSET_MIN_SCORE = 100
 
 
 def fetch_text(url: str) -> str:
@@ -93,15 +94,18 @@ def extract_arxiv_id(text: str) -> str | None:
 
 def safe_extract_tar(archive_path: Path, destination: Path) -> list[str]:
     extracted: list[str] = []
-    with tarfile.open(archive_path) as archive:
-        for member in archive.getmembers():
-            member_path = destination / member.name
-            resolved_destination = destination.resolve()
-            resolved_member = member_path.resolve()
-            if resolved_destination not in resolved_member.parents and resolved_member != resolved_destination:
-                continue
-            archive.extract(member, destination)
-            extracted.append(member.name)
+    try:
+        with tarfile.open(archive_path) as archive:
+            for member in archive.getmembers():
+                member_path = destination / member.name
+                resolved_destination = destination.resolve()
+                resolved_member = member_path.resolve()
+                if resolved_destination not in resolved_member.parents and resolved_member != resolved_destination:
+                    continue
+                archive.extract(member, destination)
+                extracted.append(member.name)
+    except (tarfile.TarError, OSError):
+        return []
     return extracted
 
 
@@ -115,7 +119,7 @@ def default_asset_dir(json_path: Path, target_name: str) -> Path:
 
 def default_output_markdown(json_path: Path, target_name: str) -> Path:
     safe_name = sanitize_target_name(target_name)
-    return json_path.parent / f"{safe_name}_extrapar+.md"
+    return json_path.parent / f"{safe_name}_extrapar.md"
 
 
 def extract_numbers(line: str) -> list[str]:
@@ -456,7 +460,7 @@ def collect_local_measurements(
     measurements: list[dict[str, str]] = []
     seen_rows: set[tuple[str, str, str, str, str]] = set()
     orbital_period_days: float | None = None
-    for tex_path in sorted(asset_dir.glob("*.tex")):
+    for tex_path in sorted(asset_dir.glob("**/*.tex")):
         tex_content = tex_path.read_text(encoding="utf-8", errors="replace")
         matching_blocks = find_target_table_blocks(tex_content, target_name)
         if not matching_blocks:
@@ -532,18 +536,26 @@ def render_parameter_markdown(
     measurements: list[dict[str, str]],
     missing: list[dict[str, str]],
     asset_dir: Path,
+    downloaded_ranked: list[dict[str, Any]],
 ) -> str:
     lines: list[str] = []
-    lines.append(f"# {metadata['query_target']} extrapar+")
+    lines.append(f"# {metadata['query_target']} extrapar")
     lines.append("")
     lines.append(f"Generated at: {datetime.now(timezone.utc).isoformat()}")
     lines.append(f"Target: {metadata['query_target']}")
     lines.append(f"Primary name: {metadata['object_name']}")
     lines.append(f"Asset directory: {asset_dir}")
+    lines.append(f"Checked references: {len(ranked)}")
+    lines.append(f"Downloaded candidate assets: {len(downloaded_ranked)}")
     lines.append("")
     lines.append("## Reviewed references")
     lines.append("")
-    for item in ranked[:5]:
+    for item in ranked:
+        lines.append(f"- {item['bibcode']}: {item['title']}")
+    lines.append("")
+    lines.append("## Downloaded candidate references")
+    lines.append("")
+    for item in downloaded_ranked:
         lines.append(f"- {item['bibcode']}: {item['title']}")
     lines.append("")
     lines.append("## Parameter table")
@@ -586,38 +598,43 @@ def save_reference_assets(
 ) -> None:
     asset_dir.mkdir(parents=True, exist_ok=True)
     manifest: dict[str, dict[str, Any]] = {}
-    for item in ranked[:3]:
+    for item in ranked:
         bibcode = item["bibcode"]
+        bibcode_dir = asset_dir / sanitize_target_name(bibcode)
+        bibcode_dir.mkdir(parents=True, exist_ok=True)
         record: dict[str, Any] = {
             "ads": item["ads"],
             "vizier_catalog": item["vizier_catalog"],
             "arxiv": item["arxiv"],
         }
-        ads_html_path = asset_dir / f"{bibcode}_ads_abstract.html"
+        ads_html_path = bibcode_dir / "ads_abstract.html"
         if not ads_html_path.exists():
             ads_html_path.write_text(fetch_text(item["ads"]), encoding="utf-8")
         ads_html = ads_html_path.read_text(encoding="utf-8", errors="replace")
-        record["ads_html"] = ads_html_path.name
+        record["ads_html"] = str(ads_html_path.relative_to(asset_dir))
 
         arxiv_id = extract_arxiv_id(ads_html)
         if arxiv_id:
             record["arxiv_id"] = arxiv_id
-            source_tar_path = asset_dir / f"{bibcode}_source.tar"
+            source_tar_path = bibcode_dir / "source.tar"
             if not source_tar_path.exists():
                 source_tar_path.write_bytes(
                     fetch_bytes(f"https://arxiv.org/e-print/{arxiv_id}"))
-            record["source_tar"] = source_tar_path.name
-            extracted = safe_extract_tar(source_tar_path, asset_dir)
+            record["source_tar"] = str(source_tar_path.relative_to(asset_dir))
+            extracted = safe_extract_tar(source_tar_path, bibcode_dir)
             if extracted:
                 record["extracted_files"] = extracted[:50]
+            else:
+                record["source_extract_error"] = (
+                    "arXiv e-print did not unpack as a tar archive")
 
         vizier_url = item["vizier_catalog"] or item["vizier_target_search"]
         if vizier_url:
-            vizier_path = asset_dir / f"{bibcode}_vizier.html"
+            vizier_path = bibcode_dir / "vizier.html"
             if not vizier_path.exists():
                 vizier_path.write_text(fetch_text(vizier_url),
                                        encoding="utf-8")
-            record["vizier_html"] = vizier_path.name
+            record["vizier_html"] = str(vizier_path.relative_to(asset_dir))
 
         manifest[bibcode] = record
 
@@ -625,6 +642,34 @@ def save_reference_assets(
     manifest_path.write_text(json.dumps(manifest, indent=2,
                                         ensure_ascii=False),
                              encoding="utf-8")
+
+
+def select_asset_references(
+    ranked: list[dict[str, Any]],
+    prioritized: set[str],
+    min_score: int,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for item in ranked:
+        hit_names = set(item["hits"])
+        if prioritized and hit_names.intersection(prioritized):
+            selected.append(item)
+            continue
+        if item["score"] >= min_score:
+            selected.append(item)
+
+    if selected:
+        return selected
+
+    if prioritized:
+        fallback = [
+            item for item in ranked
+            if set(item["hits"]).intersection(prioritized)
+        ]
+        if fallback:
+            return fallback
+
+    return ranked[:min(25, len(ranked))]
 
 
 def parse_args() -> argparse.Namespace:
@@ -637,8 +682,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--top",
         type=int,
-        default=8,
-        help="Maximum number of ranked references to print",
+        default=0,
+        help=("Maximum number of ranked references to keep; use 0 to keep all "
+              "references (default)"),
     )
     parser.add_argument(
         "--parameters",
@@ -650,13 +696,26 @@ def parse_args() -> argparse.Namespace:
         "--write-extrapar-markdown",
         action="store_true",
         help=
-        "Write an independent target parameter markdown named <target>_extrapar+.md",
+        "Write an independent target parameter markdown named <target>_extrapar.md",
     )
     parser.add_argument(
         "--download-assets",
         action="store_true",
         help=
         "Download ADS/arXiv/VizieR assets into results/<target>/ before extraction",
+    )
+    parser.add_argument(
+        "--asset-min-score",
+        type=int,
+        default=DEFAULT_ASSET_MIN_SCORE,
+        help=
+        "Minimum ranking score for automatic asset downloads when --download-assets is used",
+    )
+    parser.add_argument(
+        "--download-all-assets",
+        action="store_true",
+        help=
+        "Download assets for every ranked reference instead of only the high-priority candidate subset",
     )
     parser.add_argument(
         "--asset-dir",
@@ -670,7 +729,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help=
-        "Override the output markdown path; default is results/<target>_extrapar+.md",
+        "Override the output markdown path; default is results/<target>_extrapar.md",
     )
     return parser.parse_args()
 
@@ -704,8 +763,8 @@ def normalize_parameter_name(name: str) -> str:
 
 
 def extract_target_metadata(payload: dict[str, Any]) -> dict[str, Any]:
-    target = payload.get("target", {})
-    simbad = target.get("simbad", {})
+    target = payload.get("target") or {}
+    simbad = target.get("simbad") or {}
     return {
         "query_target":
         target.get("query_target") or payload.get("query_target") or "unknown",
@@ -899,25 +958,35 @@ def main() -> None:
         summaries,
         key=lambda item: (item["score"], item["obj_freq"], item["year"]),
         reverse=True,
-    )[:max(1, args.top)]
+    )
+    if args.top > 0:
+        ranked = ranked[:args.top]
     output = render(metadata, ranked, prioritized)
 
     if args.write_extrapar_markdown:
         asset_dir = args.asset_dir or default_asset_dir(
             args.json_path, metadata["query_target"])
         asset_dir.mkdir(parents=True, exist_ok=True)
+        downloaded_ranked = ranked
         if args.download_assets:
-            save_reference_assets(ranked, asset_dir)
+            downloaded_ranked = (ranked if args.download_all_assets else
+                                 select_asset_references(
+                                     ranked,
+                                     prioritized_set,
+                                     args.asset_min_score,
+                                 ))
+            save_reference_assets(downloaded_ranked, asset_dir)
         measurements = collect_local_measurements(asset_dir,
                                                   metadata["query_target"],
-                                                  ranked)
-        missing = not_found_rows(ranked)
+                                                  downloaded_ranked)
+        missing = not_found_rows(downloaded_ranked)
         markdown_text = render_parameter_markdown(
             metadata=metadata,
             ranked=ranked,
             measurements=measurements,
             missing=missing,
             asset_dir=asset_dir,
+            downloaded_ranked=downloaded_ranked,
         )
         output_markdown = args.output_markdown or default_output_markdown(
             args.json_path, metadata["query_target"])

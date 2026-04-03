@@ -11,7 +11,7 @@ user-invocable: true
 
 This skill turns one target JSON report in results into a reproducible literature-search workflow for stellar rotation and activity parameters. It is designed for cases where the JSON already contains a populated references list from SIMBAD and you want to find parameter measurements in papers, VizieR tables, and arXiv versions.
 
-It can also generate an independent markdown file named like results/KIC 4931738_extrapar+.md without modifying the original target report markdown.
+It can also generate an independent markdown file named like results/KIC 4931738_extrapar.md without modifying the original target report markdown.
 
 Primary parameters in scope:
 - Period
@@ -57,6 +57,8 @@ Secondary context in scope when it helps interpret those parameters:
 
 3. Generate a first-pass search plan.
    - Use the bundled script [prepare_reference_hunt.py](./scripts/prepare_reference_hunt.py) to produce a ranked checklist from the JSON file.
+   - By default, the script keeps and processes the full references list; only pass --top N when you intentionally want to cap the review scope.
+   - When --download-assets is enabled, the script still checks the full ranked list but only downloads high-priority candidate assets by default, so large targets do not stall on thousands of full-text fetches.
    - Review the output table, ADS link, candidate VizieR catalog code, and arXiv query for each prioritized paper.
    - When you need a reusable artifact, run the same script with --write-extrapar-markdown so it writes a standalone parameter table markdown next to the JSON file.
 
@@ -96,7 +98,7 @@ Secondary context in scope when it helps interpret those parameters:
    - Include one row per parameter measurement.
    - Add target alias used in the source, component tag if relevant, value, uncertainty, units, method, bibcode, and notes.
    - Mark missing parameters explicitly as not found after checked references.
-   - Write the table to a separate markdown file named <target>_extrapar+.md so the original <target>.md report remains unchanged.
+   - Write the table to a separate markdown file named <target>_extrapar.md so the original <target>.md report remains unchanged.
 
 ## Quality Checks
 
@@ -116,7 +118,7 @@ Use this structure in notes or downstream JSON fragments:
 
 ## Tools In This Skill
 
-- [prepare_reference_hunt.py](./scripts/prepare_reference_hunt.py): Reads a target JSON, prints a ranked literature hunt, optionally downloads assets into results/<target>/, and can write a standalone <target>_extrapar+.md parameter table.
+- [prepare_reference_hunt.py](./scripts/prepare_reference_hunt.py): Reads a target JSON, ranks the full reference list by default, optionally downloads high-priority candidate assets into results/<target>/, and can write a standalone <target>_extrapar.md parameter table.
 - [parameter-extraction.md](./references/parameter-extraction.md): Parameter synonyms, source heuristics, and ambiguity checks.
 
 ## Suggested Invocation Patterns
@@ -124,4 +126,4 @@ Use this structure in notes or downstream JSON fragments:
 - Use this skill for results/KIC 4931738.json and prioritize Period, vsini, RV, INCL, and <Bl>.
 - Use this skill on the current target JSON and generate a literature hunt table.
 - Use this skill to inspect the references list and build a parameter summary for a Kepler B-type binary.
-- Use this skill on results/KIC 4931738.json, download assets into results/KIC 4931738/, and write results/KIC 4931738_extrapar+.md.
+- Use this skill on results/KIC 4931738.json, download assets into results/KIC 4931738/, and write results/KIC 4931738_extrapar.md.

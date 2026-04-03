@@ -33,18 +33,17 @@
 适用场景：
 - 你已经有 `results/<target>.json`，希望从 `target.simbad.references` 里继续追踪文献参数。
 - 需要重点提取以下参数：`Period`、`Mass`、`Teff`、`log g`、`vsini`、`RV`、`INCL`、`<Bl>`。
-- 希望将参数提取结果写到独立文件 `<target>_extrapar+.md`，而不覆盖原始目标报告。
+- 希望将参数提取结果写到独立文件 `<target>_extrapar.md`，而不覆盖原始目标报告。
 
 在 Copilot Chat 里的典型请求方式：
 - `使用 stellar-rotation-activity-params 技能分析 results/KIC 4931738.json，优先 Period, vsini, RV, INCL, <Bl>。`
-- `使用 stellar-rotation-activity-params 技能，下载文献资产到 results/KIC 4931738/，并生成 results/KIC 4931738_extrapar+.md。`
+- `使用 stellar-rotation-activity-params 技能，下载文献资产到 results/KIC 4931738/，并生成 results/KIC 4931738_extrapar.md。`
 
 如果你想先离线生成“文献追踪清单”，可直接运行技能附带脚本：
 
 ```bash
 python .github/skills/stellar-rotation-activity-params/scripts/prepare_reference_hunt.py \
    "results/KIC 4931738.json" \
-   --top 10 \
    --parameters Period vsini RV INCL "<Bl>"
 ```
 
@@ -57,7 +56,9 @@ python .github/skills/stellar-rotation-activity-params/scripts/prepare_reference
    --download-assets
 ```
 
-说明：默认会在 JSON 同目录输出 `results/<target>_extrapar+.md`，并在 `results/<target>/` 下保存下载资产（可用 `--output-markdown` 与 `--asset-dir` 覆盖）。
+说明：默认会在 JSON 同目录输出 `results/<target>_extrapar.md`，并在 `results/<target>/` 下保存下载资产（可用 `--output-markdown` 与 `--asset-dir` 覆盖）。
+补充：脚本默认会筛查并保留该目标的全部参考文献；只有显式传入 `--top N` 时才会限制到前 N 篇。
+补充：启用 `--download-assets` 时，默认只下载高优先级候选文献的资产，而不是把全部参考文献都下载到本地；若你确实要下载全部已排序文献，可显式加 `--download-all-assets`。
 
 A Python agent-style tool for astronomy target lookup and summarization.
 
