@@ -789,6 +789,7 @@ class TargetInfoAgent:
                 archive_references,
                 focused_host_references,
             )
+            result.literature_references = combined_references
 
             if combined_references:
                 print("[module] start LiteratureWorkflow")
@@ -806,6 +807,7 @@ class TargetInfoAgent:
                     "Literature workflow skipped: no planet-focused references found from host SIMBAD or NASA Exoplanet Archive"
                 )
         elif simbad is not None:
+            result.literature_references = simbad.references
             print("[module] start LiteratureWorkflow")
             result.literature_workflow = self._build_literature_workflow(
                 simbad.references,
@@ -825,6 +827,7 @@ class TargetInfoAgent:
                     gaia,
                     mast,
                     planet,
+                    result.literature_references,
                     result.literature_workflow,
                 )
                 print("[module] done DeepSeek (ok)")

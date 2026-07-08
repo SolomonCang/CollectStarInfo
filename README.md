@@ -2,9 +2,9 @@
 
 ## 中文使用说明
 
-这是一个用于批量检索恒星/天体信息的工具，会整合 SIMBAD、Gaia DR3、MAST 等数据源，并输出结构化报告。
+这是一个用于检索恒星/天体信息的工具，会整合 SIMBAD、Gaia DR3、MAST 等数据源，并输出结构化报告。当前已新增交互式 Web 架构：FastAPI 后端复用原有检索逻辑，React 前端可查询目标、调用 DeepSeek 做文献调研，从 MAST 检索/下载 TESS、Kepler、K2 光变曲线产品，并对本地光变曲线做去趋势、周期搜索和相位折叠。
 
-重点：可以直接运行 `run_agent.py`，无需额外封装脚本。
+命令行批处理仍可直接运行 `run_agent.py`；交互式工具见下方“Web 工作台”。
 
 配置方式：统一使用 `config.yaml`，不再使用环境变量文件。
 
@@ -17,10 +17,52 @@
 3. 直接运行查询（不使用 LLM，总结更稳定）
    - `python run_agent.py --targets-file targets_input.txt --format both --no-llm`
 4. 直接运行查询（启用 LLM 总结）
-   - 先在 `config.yaml` 中配置 DeepSeek API Key
+   - 先在项目根目录的 `DSAPI.key` 中写入 DeepSeek API Key
    - 再执行 `python run_agent.py --targets-file targets_input.txt --format both --use-llm`
 5. 查看输出
    - 结果默认写入 `results/`，每个目标会生成同名 `.json` 和 `.md` 报告。
+
+## Web 工作台
+
+后端：
+
+```bash
+.venv/bin/uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+前端：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+前端默认连接 `http://127.0.0.1:8000`。工作台分为“目标信息”和“光变曲线”两个页面；文献调研面板会使用 `DSAPI.key` 中的 DeepSeek API Key 和 `config.yaml` 中的模型配置，对当前目标的 SIMBAD references 和 literature workflow 做中文分析。
+
+目标查询默认会优先载入 `results/<target>.json` 中已有信息，避免重复访问外部数据库；在前端勾选“强制重新检索”后，会重新调用 SIMBAD/Gaia/MAST/DeepSeek，并把新的 JSON 写回 `results/`。
+
+MAST 光变曲线下载会写入：
+
+```text
+data/lightcurves/<target>/<YYYYMMDDTHHMMSSZ>/
+```
+
+其中包含下载的 FITS 产品、`selected_products.json`、`manifest.json` 和后端自动转换出的 `lightcurve.csv`。`results/` 继续只作为目标查询报告目录，不再混放下载数据。
+
+下载完成后，前端会自动选中新数据集；也可以在独立“光变曲线”页面从“已下载数据集”下拉框选择历史下载。后端会读取该目录下的 `manifest.json` 和 FITS 文件，优先使用 `PDCSAP_FLUX`，应用 `QUALITY == 0` 过滤，生成 `time,flux,flux_error` CSV，并送入去趋势、Lomb-Scargle 周期搜索、频谱图和相位折叠分析。相位折叠周期可使用最佳周期，也可从频谱图点击选择或手动输入。
+
+也可以在项目根目录用启动器一次性启动前后端并打开网页：
+
+```bash
+python launch_web.py
+```
+
+如需只启动不打开浏览器：
+
+```bash
+python launch_web.py --no-open
+```
 
 提示：如果只想跑单个目标，可用 `--targets "Proxima Centauri"` 直接传参。
 也可以直接传坐标，例如 `python run_agent.py --targets "14:29:42.95 -62:40:46.2" --no-llm`。
@@ -80,7 +122,7 @@ A Python agent-style tool for astronomy target lookup and summarization.
    - pip install -r requirements.txt
 
 ## Configure DeepSeek (optional)
-Set `deepseek.api_key` in `config.yaml`.
+Put the DeepSeek API key in `DSAPI.key` at the project root. The file can contain either the raw key or a `DEEPSEEK_API_KEY=...` style line. `config.yaml` still controls `deepseek.base_url` and `deepseek.model`.
 
 Use `config.yaml` in project root to configure runtime parameters
 (DeepSeek API, run switches, output defaults, and agent defaults).

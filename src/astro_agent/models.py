@@ -95,6 +95,8 @@ class TargetResult:
     gaia: GaiaRecord | None = None
     mast: MastRecord | None = None
     planet: PlanetRecord | None = None
+    literature_references: list[dict[str, str | list[str]]] = field(
+        default_factory=list)
     literature_workflow: LiteratureWorkflow | None = None
     summary: str | None = None
     notes: list[str] = field(default_factory=list)

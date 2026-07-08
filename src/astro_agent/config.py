@@ -28,6 +28,8 @@ class Settings:
 
 
 DEFAULT_CONFIG_YAML = Path("config.yaml")
+DEFAULT_DEEPSEEK_KEY_FILE = Path("DSAPI.key")
+PLACEHOLDER_API_KEYS = {"yourkey", "your_key", "your-api-key", "your_api_key"}
 
 
 def _read_yaml_config(config_path: Path) -> dict[str, Any]:
@@ -104,6 +106,45 @@ def _as_optional_str(value: Any) -> str | None:
     return text if text else None
 
 
+def _is_placeholder_api_key(value: str | None) -> bool:
+    if value is None:
+        return True
+    normalized = value.strip().strip('"').strip("'").casefold()
+    return not normalized or normalized in PLACEHOLDER_API_KEYS
+
+
+def _extract_api_key(raw_text: str) -> str | None:
+    for raw_line in raw_text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            _, line = line.split("=", 1)
+        key = line.strip().strip('"').strip("'")
+        if key:
+            return key
+    return None
+
+
+def _read_api_key_file(config_path: Path) -> str | None:
+    candidate_paths = [
+        config_path.parent / DEFAULT_DEEPSEEK_KEY_FILE,
+        DEFAULT_DEEPSEEK_KEY_FILE,
+    ]
+    seen: set[Path] = set()
+    for path in candidate_paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if not path.exists() or path.is_dir():
+            continue
+        api_key = _extract_api_key(path.read_text(encoding="utf-8"))
+        if not _is_placeholder_api_key(api_key):
+            return api_key
+    return None
+
+
 def _yaml_get(mapping: dict[str, Any], *path: str) -> Any:
     current: Any = mapping
     for key in path:
@@ -117,8 +158,13 @@ def load_settings(config_path: str | None = None, ) -> Settings:
     yaml_path = Path(config_path) if config_path else DEFAULT_CONFIG_YAML
     yaml_config = _read_yaml_config(yaml_path)
 
-    deepseek_api_key = _as_optional_str(
+    file_api_key = _read_api_key_file(yaml_path)
+    config_api_key = _as_optional_str(
         _yaml_get(yaml_config, "deepseek", "api_key"), )
+    deepseek_api_key = file_api_key
+    if deepseek_api_key is None and not _is_placeholder_api_key(
+            config_api_key):
+        deepseek_api_key = config_api_key
     raw_deepseek_base_url = _yaml_get(yaml_config, "deepseek", "base_url")
     deepseek_base_url = _as_str(raw_deepseek_base_url,
                                 "https://api.deepseek.com/v1").rstrip("/")

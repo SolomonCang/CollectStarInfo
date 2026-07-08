@@ -15,8 +15,13 @@ dist/
 .pytest_cache/
 .mypy_cache/
 
+# Frontend dependencies/build artifacts
+node_modules/
+
 # Local outputs
 results/
+data/lightcurves/*
+!data/lightcurves/.gitkeep
 *.log
 
 # OS/editor local files
