@@ -1,0 +1,12 @@
+services:
+  target-info-search:
+    build: .
+    container_name: target-info-search
+    ports:
+      - "8000:8000"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    volumes:
+      - ./results:/app/results
+      - ./data/lightcurves:/app/data/lightcurves
+    restart: unless-stopped

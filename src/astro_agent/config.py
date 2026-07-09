@@ -1,0 +1,231 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover
+    yaml = None
+
+
+@dataclass
+class Settings:
+    deepseek_api_key: str | None
+    deepseek_base_url: str
+    deepseek_model: str
+    timeout_sec: int
+    default_use_llm: bool
+    default_targets: list[str]
+    default_targets_file: str | None
+    default_output_dir: str
+    default_output_format: str
+    default_gaia_cone_radius_arcsec: float
+    default_mast_radius_deg: float
+    default_simbad_reference_time_range: str
+    default_literature_min_obj_freq: int
+
+
+DEFAULT_CONFIG_YAML = Path("config.yaml")
+DEFAULT_DEEPSEEK_KEY_FILE = Path("DSAPI.key")
+PLACEHOLDER_API_KEYS = {"yourkey", "your_key", "your-api-key", "your_api_key"}
+
+
+def _read_yaml_config(config_path: Path) -> dict[str, Any]:
+    if not config_path.exists() or config_path.is_dir():
+        return {}
+    if yaml is None:
+        raise RuntimeError(
+            "PyYAML is required to read config.yaml. "
+            "Install dependencies with: pip install -r requirements.txt")
+
+    content = config_path.read_text(encoding="utf-8")
+    loaded = yaml.safe_load(content)
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def _as_str(value: Any, default: str) -> str:
+    if value is None:
+        return default
+    text = str(value).strip()
+    return text if text else default
+
+
+def _as_int(value: Any, default: int) -> int:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_float(value: Any, default: float) -> float:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def _as_targets(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            text = str(item).strip()
+            if text:
+                result.append(text)
+        return result
+    return []
+
+
+def _as_optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text if text else None
+
+
+def _is_placeholder_api_key(value: str | None) -> bool:
+    if value is None:
+        return True
+    normalized = value.strip().strip('"').strip("'").casefold()
+    return not normalized or normalized in PLACEHOLDER_API_KEYS
+
+
+def _extract_api_key(raw_text: str) -> str | None:
+    for raw_line in raw_text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            _, line = line.split("=", 1)
+        key = line.strip().strip('"').strip("'")
+        if key:
+            return key
+    return None
+
+
+def _read_api_key_file(config_path: Path) -> str | None:
+    candidate_paths = [
+        config_path.parent / DEFAULT_DEEPSEEK_KEY_FILE,
+        DEFAULT_DEEPSEEK_KEY_FILE,
+    ]
+    seen: set[Path] = set()
+    for path in candidate_paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if not path.exists() or path.is_dir():
+            continue
+        api_key = _extract_api_key(path.read_text(encoding="utf-8"))
+        if not _is_placeholder_api_key(api_key):
+            return api_key
+    return None
+
+
+def _yaml_get(mapping: dict[str, Any], *path: str) -> Any:
+    current: Any = mapping
+    for key in path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
+def load_settings(config_path: str | None = None, ) -> Settings:
+    yaml_path = Path(config_path) if config_path else DEFAULT_CONFIG_YAML
+    yaml_config = _read_yaml_config(yaml_path)
+
+    file_api_key = _read_api_key_file(yaml_path)
+    config_api_key = _as_optional_str(
+        _yaml_get(yaml_config, "deepseek", "api_key"), )
+    deepseek_api_key = file_api_key
+    if deepseek_api_key is None and not _is_placeholder_api_key(
+            config_api_key):
+        deepseek_api_key = config_api_key
+    raw_deepseek_base_url = _yaml_get(yaml_config, "deepseek", "base_url")
+    deepseek_base_url = _as_str(raw_deepseek_base_url,
+                                "https://api.deepseek.com/v1").rstrip("/")
+    raw_deepseek_model = _yaml_get(yaml_config, "deepseek", "model")
+    deepseek_model = _as_str(raw_deepseek_model, "deepseek-chat")
+
+    raw_timeout_sec = _yaml_get(yaml_config, "http", "timeout_sec")
+    timeout_sec = _as_int(raw_timeout_sec, 45)
+
+    default_use_llm = _as_bool(
+        _yaml_get(yaml_config, "run", "use_llm"),
+        True,
+    )
+    default_targets = _as_targets(_yaml_get(yaml_config, "run", "targets"))
+
+    default_targets_file_raw = _yaml_get(yaml_config, "run", "targets_file")
+    default_targets_file = None
+    if default_targets_file_raw is not None:
+        text = str(default_targets_file_raw).strip()
+        if text:
+            default_targets_file = text
+
+    default_output_dir = _as_str(
+        _yaml_get(yaml_config, "output", "dir"),
+        "results",
+    )
+    default_output_format = _as_str(
+        _yaml_get(yaml_config, "output", "format"),
+        "both",
+    )
+    if default_output_format not in {"json", "md", "txt", "both", "all"}:
+        default_output_format = "both"
+
+    default_simbad_reference_time_range = _as_str(
+        _yaml_get(yaml_config, "agent", "simbad_reference_time_range"),
+        "all",
+    )
+    if default_simbad_reference_time_range not in {"all", "recent10"}:
+        default_simbad_reference_time_range = "all"
+
+    return Settings(
+        deepseek_api_key=deepseek_api_key,
+        deepseek_base_url=deepseek_base_url,
+        deepseek_model=deepseek_model,
+        timeout_sec=timeout_sec,
+        default_use_llm=default_use_llm,
+        default_targets=default_targets,
+        default_targets_file=default_targets_file,
+        default_output_dir=default_output_dir,
+        default_output_format=default_output_format,
+        default_gaia_cone_radius_arcsec=_as_float(
+            _yaml_get(yaml_config, "agent", "gaia_cone_radius_arcsec"),
+            5.0,
+        ),
+        default_mast_radius_deg=_as_float(
+            _yaml_get(yaml_config, "agent", "mast_radius_deg"),
+            0.02,
+        ),
+        default_simbad_reference_time_range=default_simbad_reference_time_range,
+        default_literature_min_obj_freq=_as_int(
+            _yaml_get(yaml_config, "agent", "literature_min_obj_freq"),
+            3,
+        ),
+    )
