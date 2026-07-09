@@ -1,0 +1,38 @@
+# Environment and secrets
+.env
+.venv/
+.gitignore
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+
+# Frontend dependencies/build artifacts
+node_modules/
+
+# Local outputs
+results/
+data/lightcurves/*
+!data/lightcurves/.gitkeep
+*.log
+
+# Docker wheels (offline packages)
+docker-wheels/
+
+# OS/editor local files
+.DS_Store
+.vscode/
+.idea/
+
+# API keys and secrets (if any were accidentally committed)
+*.key
+start_agent_with_key.py
+src/astro_agent/key_sync.py
