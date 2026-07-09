@@ -402,7 +402,7 @@ function foldCurve(curve, period) {
   if (!Number.isFinite(period) || period <= 0) {
     return [];
   }
-  return curve
+  const singleCycle = curve
     .map((point) => ({
       phase: ((point.time / period) % 1 + 1) % 1,
       flux: point.normalized_flux,
@@ -410,6 +410,38 @@ function foldCurve(curve, period) {
     }))
     .filter((point) => Number.isFinite(point.phase) && Number.isFinite(point.flux))
     .sort((left, right) => left.phase - right.phase);
+  // Dual-cycle [0, 2] – duplicate with phase shifted by +1
+  const dualCycle = [
+    ...singleCycle,
+    ...singleCycle.map((point) => ({ ...point, phase: point.phase + 1 })),
+  ];
+  return dualCycle;
+}
+
+function foldCurveBinned(curve, period, numBins = 20) {
+  if (!Number.isFinite(period) || period <= 0 || !curve.length) {
+    return [];
+  }
+  const bins = Array.from({ length: numBins }, (_, i) => ({
+    phase: (i + 0.5) / numBins,
+    sum: 0,
+    count: 0,
+  }));
+  for (const point of curve) {
+    const phase = ((point.time / period) % 1 + 1) % 1;
+    if (!Number.isFinite(phase) || !Number.isFinite(point.normalized_flux)) continue;
+    const idx = Math.min(numBins - 1, Math.floor(phase * numBins));
+    bins[idx].sum += point.normalized_flux;
+    bins[idx].count += 1;
+  }
+  const singleBin = bins
+    .filter((bin) => bin.count > 0)
+    .map((bin) => ({ phase: bin.phase, flux: bin.sum / bin.count }));
+  // Dual-cycle [0, 2]
+  return [
+    ...singleBin,
+    ...singleBin.map((bin) => ({ phase: bin.phase + 1, flux: bin.flux })),
+  ];
 }
 
 function spectrumTooltipLabel(frequency) {
@@ -570,6 +602,11 @@ function LightCurvePage({
 }) {
   const periodogram = analysis?.period_search?.periodogram ?? [];
   const periodOptions = buildPeriodOptions(analysis);
+  const selectedManualPeriod = Number(phasePeriod);
+  const selectedBestPeriod = analysis?.period_search?.best_period;
+  const selectedPhasePeriod = phasePeriodMode === "manual" && Number.isFinite(selectedManualPeriod) && selectedManualPeriod > 0
+    ? selectedManualPeriod
+    : selectedBestPeriod;
 
   return (
     <section className="lc-workspace">
@@ -833,6 +870,14 @@ function LightCurvePage({
                         name === "power" ? `power, period ${item.payload.period.toPrecision(7)}` : name,
                       ]}
                     />
+                    {analysis?.period_search?.noise_stats?.threshold_4sigma != null && (
+                      <ReferenceLine
+                        y={analysis.period_search.noise_stats.threshold_4sigma}
+                        stroke="#6b7280"
+                        strokeDasharray="6 3"
+                        label={{ value: "4σ", position: "right", fill: "#6b7280", fontSize: 12 }}
+                      />
+                    )}
                     {analysis?.period_search?.best_frequency && (
                       <ReferenceLine
                         x={analysis.period_search.best_frequency}
@@ -854,7 +899,21 @@ function LightCurvePage({
           <div className="panel-card">
             <div className="section-title"><Orbit size={18} /> 周期指标</div>
             <Metric label="Best period" value={analysis?.period_search?.best_period?.toPrecision?.(7)} />
+            <Metric
+              label="Period (hours)"
+              value={analysis?.period_search?.best_period ? (analysis.period_search.best_period * 24).toPrecision(6) : "-"}
+            />
+            <Metric
+              label="Period (minutes)"
+              value={analysis?.period_search?.best_period ? (analysis.period_search.best_period * 1440).toFixed(2) : "-"}
+            />
             <Metric label="Power" value={analysis?.period_search?.power?.toFixed?.(4)} />
+            {analysis?.period_search?.noise_stats && (
+              <>
+                <Metric label="4σ threshold" value={analysis.period_search.noise_stats.threshold_4sigma?.toFixed?.(4)} />
+                <Metric label="Noise σ" value={analysis.period_search.noise_stats.sigma?.toFixed?.(4)} />
+              </>
+            )}
             <Metric
               label="Phase period"
               value={
@@ -865,15 +924,29 @@ function LightCurvePage({
             />
           </div>
           <div className="panel-card phase-card">
-            <div className="section-title"><Activity size={18} /> 相位折叠</div>
+            <div className="section-title"><Activity size={18} /> 相位折叠 (2 Cycles)</div>
             {phaseCurve.length ? (
-              <ResponsiveContainer width="100%" height={260}>
+              <ResponsiveContainer width="100%" height={320}>
                 <ScatterChart margin={{ top: 10, right: 16, bottom: 8, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="phase" type="number" domain={[0, 1]} />
+                  <XAxis dataKey="phase" type="number" domain={[0, 2]} tickCount={5} />
                   <YAxis dataKey="flux" domain={["auto", "auto"]} />
                   <Tooltip />
-                  <Scatter data={phaseCurve} fill="#0f766e" />
+                  {/* 底层: 灰点原始数据 */}
+                  <Scatter data={phaseCurve} fill="#9ca3af" fillOpacity={0.35} name="Raw" />
+                  {/* 顶层: 红色分箱点+连线 */}
+                  {foldCurveBinned(curve, selectedPhasePeriod).length > 0 && (
+                    <Scatter
+                      data={foldCurveBinned(curve, selectedPhasePeriod)}
+                      fill="#ef4444"
+                      stroke="#ef4444"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      name="Binned (20 bins)"
+                      shape="circle"
+                      legendType="circle"
+                    />
+                  )}
                 </ScatterChart>
               </ResponsiveContainer>
             ) : (

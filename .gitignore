@@ -24,6 +24,9 @@ data/lightcurves/*
 !data/lightcurves/.gitkeep
 *.log
 
+# Docker wheels (offline packages)
+docker-wheels/
+
 # OS/editor local files
 .DS_Store
 .vscode/

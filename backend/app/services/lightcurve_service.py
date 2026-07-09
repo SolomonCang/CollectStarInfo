@@ -154,6 +154,24 @@ def _search_period(
     phase_order = np.argsort(phase)
     period = 1.0 / frequency
 
+    # --- 4σ noise statistics ---
+    noise_median = float(np.nanmedian(power))
+    noise_sigma = float(np.nanstd(power))
+    threshold_4sigma = noise_median + 4.0 * noise_sigma
+
+    # --- phase binning (for binned overlay on folded curve) ---
+    num_bins = 20
+    bin_edges = np.linspace(0, 1, num_bins + 1)
+    phase_bins: list[dict[str, float]] = []
+    for i in range(num_bins):
+        mask = (phase >= bin_edges[i]) & (phase < bin_edges[i + 1])
+        if np.sum(mask) > 0:
+            phase_bins.append({
+                "phase": float((bin_edges[i] + bin_edges[i + 1]) / 2),
+                "flux": float(np.nanmean(flux[mask])),
+                "count": int(np.sum(mask)),
+            })
+
     if len(period) > MAX_PERIODOGRAM_POINTS:
         base_count = max(1, MAX_PERIODOGRAM_POINTS - MAX_PERIODOGRAM_PEAKS)
         base_indices = np.linspace(0, len(period) - 1, base_count, dtype=int)
@@ -174,6 +192,12 @@ def _search_period(
         best_power,
         "false_alarm_probability":
         false_alarm,
+        "noise_stats": {
+            "median": noise_median,
+            "sigma": noise_sigma,
+            "threshold_4sigma": threshold_4sigma,
+        },
+        "phase_bins": phase_bins,
         "search_window": {
             "min_period": lower,
             "max_period": upper
