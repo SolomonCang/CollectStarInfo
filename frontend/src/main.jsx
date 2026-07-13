@@ -251,53 +251,53 @@ function TargetDeepLinks({ target }) {
   const mast = target.mast ?? {};
   const workflow = target.literature_workflow ?? {};
   const references = target.simbad?.references ?? [];
-  const identifierGroups = [
-    ["TIC", mast.tic_ids ?? []],
-    ["EPIC", mast.epic_ids ?? []],
-    ["KIC", mast.kic_ids ?? []],
-  ];
+  const MISSION_ID_MAP = { TESS: ["TIC", mast.tic_ids ?? []], K2: ["EPIC", mast.epic_ids ?? []], Kepler: ["KIC", mast.kic_ids ?? []] };
   const missionEntries = Object.entries(mast.mission_observations ?? {});
+  const timeInfo = mast.mission_time_info ?? {};
   const observationCategories = workflow.observations ?? [];
   const topicCategories = workflow.research_topics ?? [];
 
   return (
     <div className="deep-link-grid">
       <DetailList title="MAST obs" count={mast.total_mission_observations ?? 0}>
-        <div className="detail-columns">
-          <div>
-            <h3>Identifiers</h3>
-            {identifierGroups.some(([, ids]) => ids.length) ? (
-              <ul className="link-list">
-                {identifierGroups.map(([kind, ids]) =>
-                  ids.map((identifier) => (
-                    <li key={`${kind}-${identifier}`}>
-                      <ExternalTextLink href={mastIdentifierUrl(kind, identifier)}>
-                        {kind} {identifier}
-                      </ExternalTextLink>
-                    </li>
-                  )),
-                )}
-              </ul>
-            ) : (
-              <div className="muted-text">No TIC/EPIC/KIC identifiers in this result.</div>
-            )}
-          </div>
-          <div>
-            <h3>Mission Coverage</h3>
-            {missionEntries.length ? (
-              <ul className="stat-list">
-                {missionEntries.map(([mission, count]) => (
-                  <li key={mission}>
-                    <span>{mission}</span>
-                    <strong>{count}</strong>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="muted-text">No mission coverage returned.</div>
-            )}
-          </div>
-        </div>
+        {missionEntries.length ? (
+          <table className="mast-mission-table">
+            <thead>
+              <tr>
+                <th>Mission</th>
+                <th>Target ID</th>
+                <th>Obs</th>
+                <th>Coverage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {missionEntries.map(([mission, count]) => {
+                const idEntry = MISSION_ID_MAP[mission];
+                const timeStr = timeInfo[mission] || "";
+                return (
+                  <tr key={mission}>
+                    <td className="mission-name">{mission}</td>
+                    <td className="mission-id">
+                      {idEntry && idEntry[1].length > 0 ? (
+                        idEntry[1].map((identifier) => (
+                          <ExternalTextLink key={`${mission}-${identifier}`} href={mastIdentifierUrl(idEntry[0], identifier)}>
+                            {idEntry[0]} {identifier}
+                          </ExternalTextLink>
+                        ))
+                      ) : (
+                        <span className="muted-text">—</span>
+                      )}
+                    </td>
+                    <td className="mission-count"><strong>{count}</strong></td>
+                    <td className="mission-time">{timeStr || <span className="muted-text">—</span>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div className="muted-text">No mission coverage returned.</div>
+        )}
         <div className="detail-footer">
           <span>Radius: {mast.region_radius_deg ?? "-"} deg</span>
           <ExternalTextLink href="https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html">Open MAST Portal</ExternalTextLink>

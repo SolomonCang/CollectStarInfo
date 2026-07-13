@@ -294,6 +294,48 @@ label {
   font-size: 0.86rem;
 }
 
+/* ── MAST mission table ─────────────────────────────── */
+.mast-mission-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.mast-mission-table thead th {
+  text-align: left;
+  font-weight: 600;
+  color: #52635e;
+  font-size: 0.82rem;
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid #dbe5df;
+}
+
+.mast-mission-table tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e4ece8;
+  vertical-align: top;
+}
+
+.mast-mission-table .mission-name {
+  font-weight: 600;
+  color: #1e3b34;
+  white-space: nowrap;
+}
+
+.mast-mission-table .mission-id {
+  word-break: break-word;
+}
+
+.mast-mission-table .mission-count {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.mast-mission-table .mission-time {
+  color: #52635e;
+  font-size: 0.84rem;
+}
+
 .link-list,
 .stat-list,
 .sample-list,

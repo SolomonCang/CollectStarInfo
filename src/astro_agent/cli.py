@@ -97,25 +97,30 @@ def _write_markdown(path: Path, item: TargetResult) -> None:
     if item.mast is not None:
         lines.append("### MAST")
         lines.append(
-            f"- TIC IDs: {', '.join(item.mast.tic_ids) if item.mast.tic_ids else 'None'}"
-        )
-        lines.append(
-            f"- EPIC IDs: {', '.join(item.mast.epic_ids) if item.mast.epic_ids else 'None'}"
-        )
-        lines.append(
-            f"- KIC IDs: {', '.join(item.mast.kic_ids) if item.mast.kic_ids else 'None'}"
-        )
-        lines.append(
             f"- Regional mission coverage radius (deg): {item.mast.region_radius_deg}"
         )
         lines.append(
             f"- Total mission observations in region: {item.mast.total_mission_observations}"
         )
         if item.mast.mission_observations:
-            lines.append("- Mission observation counts in region:")
+            MISSION_ID_MAP = {
+                "TESS": ("TIC", item.mast.tic_ids),
+                "K2": ("EPIC", item.mast.epic_ids),
+                "Kepler": ("KIC", item.mast.kic_ids),
+            }
+            lines.append("- Mission coverage:")
             for mission, count in item.mast.mission_observations.items():
+                id_parts = []
+                id_entry = MISSION_ID_MAP.get(mission)
+                if id_entry and id_entry[1]:
+                    id_parts.append(f"{id_entry[0]} {', '.join(id_entry[1])}")
                 info = item.mast.mission_time_info.get(mission, "")
-                suffix = f"  ({info})" if info else ""
+                suffix_parts = []
+                if id_parts:
+                    suffix_parts.append("; ".join(id_parts))
+                if info:
+                    suffix_parts.append(info)
+                suffix = f"  ({'; '.join(suffix_parts)})" if suffix_parts else ""
                 lines.append(f"  - {mission}: {count}{suffix}")
     else:
         lines.append("### MAST")
