@@ -92,6 +92,12 @@ def _detrend(time: np.ndarray, flux: np.ndarray, method: str, order: int,
         seg_time = time[seg_start:seg_end]
         seg_flux = flux[seg_start:seg_end]
         det_seg, coeffs = _detrend_segment(seg_time, seg_flux, order)
+        # Per-segment median normalization – ensures each segment
+        # independently centres around 1 regardless of different
+        # brightness baselines across observational epochs.
+        seg_median = np.nanmedian(det_seg)
+        if seg_median and np.abs(seg_median) > 1e-12:
+            det_seg = det_seg / seg_median
         result[seg_start:seg_end] = det_seg
         segment_coefficients.append(coeffs)
 
@@ -246,6 +252,11 @@ def analyze_light_curve(request: LightCurveAnalysisRequest) -> dict[str, Any]:
     segments_info = _segment_indices(time,
                                       request.detrend.gap_threshold or 0.0)
 
+    # Build segment label array for each point
+    seg_labels = np.full(len(time), -1, dtype=int)
+    for seg_idx, (seg_start, seg_end) in enumerate(segments_info):
+        seg_labels[seg_start:seg_end] = seg_idx
+
     return {
         "point_count": int(len(time)),
         "time_span": float(np.nanmax(time) - np.nanmin(time)),
@@ -270,6 +281,7 @@ def analyze_light_curve(request: LightCurveAnalysisRequest) -> dict[str, Any]:
                 "time": float(time[index]),
                 "raw_flux": float(flux[index]),
                 "normalized_flux": float(normalized_flux[index]),
+                "segment": int(seg_labels[index]),
             } for index in range(len(time))],
         },
         "period_search": period_result,
