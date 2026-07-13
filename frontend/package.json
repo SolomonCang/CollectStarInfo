@@ -10,11 +10,12 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
+    "lucide-react": "latest",
+    "plotly.js-dist-min": "^3.7.0",
     "react": "latest",
     "react-dom": "latest",
-    "lucide-react": "latest",
-    "recharts": "latest"
-  },
-  "devDependencies": {}
+    "react-plotly.js": "^4.0.0",
+    "recharts": "latest",
+    "vite": "latest"
+  }
 }
