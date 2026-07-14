@@ -13,7 +13,6 @@ from typing import Any, Iterator
 
 from fastapi import HTTPException
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data" / "lightcurves"
 CACHE_ROOT = DATA_ROOT / "_cache"
@@ -30,9 +29,10 @@ def utc_now() -> str:
 
 
 def stable_hash(value: Any) -> str:
-    payload = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    payload = json.dumps(value,
+                         ensure_ascii=False,
+                         sort_keys=True,
+                         separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -53,9 +53,9 @@ def read_json(path: Path, default: Any = None) -> Any:
 
 def atomic_write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.",
+                                          suffix=".tmp",
+                                          dir=path.parent)
     temporary_path = Path(temporary_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -86,12 +86,11 @@ def resolve_data_path(download_dir: str) -> Path:
     data_root = DATA_ROOT.resolve()
     if resolved != data_root and data_root not in resolved.parents:
         raise HTTPException(
-            status_code=400, detail="download_dir must be under data/lightcurves"
-        )
+            status_code=400,
+            detail="download_dir must be under data/lightcurves")
     if not resolved.exists() or not resolved.is_dir():
-        raise HTTPException(
-            status_code=404, detail=f"download_dir not found: {download_dir}"
-        )
+        raise HTTPException(status_code=404,
+                            detail=f"download_dir not found: {download_dir}")
     return resolved
 
 
@@ -109,8 +108,9 @@ def manifest_local_paths(manifest: dict[str, Any]) -> list[Path]:
 
 
 def validate_dataset_dir(
-    dataset_dir: Path, *, deep: bool = False
-) -> tuple[bool, list[str], dict[str, Any] | None]:
+        dataset_dir: Path,
+        *,
+        deep: bool = False) -> tuple[bool, list[str], dict[str, Any] | None]:
     errors: list[str] = []
     manifest_path = dataset_dir / "manifest.json"
     products_path = dataset_dir / "selected_products.json"
@@ -194,6 +194,7 @@ def remove_tree(path: Path) -> int:
 
 
 class LightCurveCacheService:
+
     def stats(self) -> dict[str, Any]:
         datasets = list(iter_dataset_dirs())
         valid = 0
@@ -203,15 +204,17 @@ class LightCurveCacheService:
             valid += int(ok)
             invalid += int(not ok)
 
-        search_files = list(SEARCH_CACHE_ROOT.glob("*.json")) if SEARCH_CACHE_ROOT.exists() else []
+        search_files = list(SEARCH_CACHE_ROOT.glob(
+            "*.json")) if SEARCH_CACHE_ROOT.exists() else []
         product_dirs = (
-            [path for path in PRODUCT_CACHE_ROOT.iterdir() if path.is_dir()]
-            if PRODUCT_CACHE_ROOT.exists()
-            else []
-        )
-        derived_files = list(DERIVED_CACHE_ROOT.rglob("*.npz")) if DERIVED_CACHE_ROOT.exists() else []
-        analysis_files = list(ANALYSIS_CACHE_ROOT.rglob("*.json")) if ANALYSIS_CACHE_ROOT.exists() else []
-        bytes_used = unique_storage_size(iter([DATA_ROOT])) if DATA_ROOT.exists() else 0
+            [path for path in PRODUCT_CACHE_ROOT.iterdir()
+             if path.is_dir()] if PRODUCT_CACHE_ROOT.exists() else [])
+        derived_files = list(DERIVED_CACHE_ROOT.rglob(
+            "*.npz")) if DERIVED_CACHE_ROOT.exists() else []
+        analysis_files = list(ANALYSIS_CACHE_ROOT.rglob(
+            "*.json")) if ANALYSIS_CACHE_ROOT.exists() else []
+        bytes_used = unique_storage_size(iter([DATA_ROOT
+                                               ])) if DATA_ROOT.exists() else 0
         return {
             "schema_version": CACHE_SCHEMA_VERSION,
             "bytes_used": bytes_used,
@@ -225,7 +228,10 @@ class LightCurveCacheService:
             "analysis_entries": len(analysis_files),
         }
 
-    def verify(self, *, deep: bool = False, repair: bool = False) -> dict[str, Any]:
+    def verify(self,
+               *,
+               deep: bool = False,
+               repair: bool = False) -> dict[str, Any]:
         results: list[dict[str, Any]] = []
         for dataset_dir in sorted(iter_dataset_dirs()):
             ok, errors, manifest = validate_dataset_dir(dataset_dir, deep=deep)
@@ -235,9 +241,12 @@ class LightCurveCacheService:
                 manifest["validated_at"] = utc_now()
                 atomic_write_json(dataset_dir / "manifest.json", manifest)
             results.append({
-                "download_dir": str(dataset_dir.relative_to(PROJECT_ROOT)),
-                "valid": ok,
-                "errors": errors,
+                "download_dir":
+                str(dataset_dir.relative_to(PROJECT_ROOT)),
+                "valid":
+                ok,
+                "errors":
+                errors,
             })
         return {
             "deep": deep,
@@ -251,12 +260,14 @@ class LightCurveCacheService:
     def delete_dataset(self, download_dir: str) -> dict[str, Any]:
         dataset_dir = resolve_data_path(download_dir)
         if dataset_dir == DATA_ROOT.resolve() or CACHE_ROOT.resolve() in (
-            dataset_dir,
-            *dataset_dir.parents,
+                dataset_dir,
+                *dataset_dir.parents,
         ):
-            raise HTTPException(status_code=400, detail="Not a dataset directory")
+            raise HTTPException(status_code=400,
+                                detail="Not a dataset directory")
         if not (dataset_dir / "manifest.json").exists():
-            raise HTTPException(status_code=400, detail="Dataset manifest not found")
+            raise HTTPException(status_code=400,
+                                detail="Dataset manifest not found")
         removed_bytes = remove_tree(dataset_dir)
         parent = dataset_dir.parent
         if parent != DATA_ROOT and not any(parent.iterdir()):
@@ -276,13 +287,16 @@ class LightCurveCacheService:
         for path in iter_dataset_dirs():
             manifest = read_json(path / "manifest.json", {})
             timestamp = path.stat().st_mtime
-            generated_at = manifest.get("last_accessed_at") or manifest.get("generated_at")
+            generated_at = manifest.get("last_accessed_at") or manifest.get(
+                "generated_at")
             if generated_at:
                 try:
-                    timestamp = datetime.fromisoformat(generated_at).timestamp()
+                    timestamp = datetime.fromisoformat(
+                        generated_at).timestamp()
                 except (TypeError, ValueError):
                     pass
-            datasets.append((path, timestamp, unique_storage_size(iter([path]))))
+            datasets.append(
+                (path, timestamp, unique_storage_size(iter([path]))))
         datasets.sort(key=lambda item: item[1])
 
         selected: list[tuple[Path, str]] = []
@@ -373,9 +387,9 @@ class LightCurveCacheService:
             partial_candidates = list(DATA_ROOT.glob("*/.partial-*"))
             downloads_root = DATA_ROOT / ".downloads"
             if downloads_root.exists():
-                partial_candidates.extend(
-                    path for path in downloads_root.iterdir() if path.is_dir()
-                )
+                partial_candidates.extend(path
+                                          for path in downloads_root.iterdir()
+                                          if path.is_dir())
             stale_partial = [
                 path for path in partial_candidates
                 if now - path.stat().st_mtime > 3600
@@ -385,15 +399,22 @@ class LightCurveCacheService:
                     removed_bytes += remove_tree(path)
 
         return {
-            "dry_run": dry_run,
-            "datasets": [
-                {"download_dir": str(path.relative_to(PROJECT_ROOT)), "reason": reason}
-                for path, reason in selected
-            ],
-            "unreferenced_products": len(unreferenced),
-            "unreferenced_derived": len(unreferenced_derived),
-            "unreferenced_analysis": len(unreferenced_analysis),
-            "expired_search_entries": len(expired_search),
-            "stale_partial_directories": len(stale_partial),
-            "removed_bytes": removed_bytes,
+            "dry_run":
+            dry_run,
+            "datasets": [{
+                "download_dir": str(path.relative_to(PROJECT_ROOT)),
+                "reason": reason
+            } for path, reason in selected],
+            "unreferenced_products":
+            len(unreferenced),
+            "unreferenced_derived":
+            len(unreferenced_derived),
+            "unreferenced_analysis":
+            len(unreferenced_analysis),
+            "expired_search_entries":
+            len(expired_search),
+            "stale_partial_directories":
+            len(stale_partial),
+            "removed_bytes":
+            removed_bytes,
         }

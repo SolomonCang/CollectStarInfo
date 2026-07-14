@@ -174,25 +174,27 @@ class LightCurveArchiveService:
     def search(self,
                request: LightCurveArchiveSearchRequest) -> dict[str, Any]:
         cache_key = stable_hash({
-            "target": request.target.strip().casefold(),
-            "ra_deg": request.ra_deg,
-            "dec_deg": request.dec_deg,
-            "radius_deg": request.radius_deg,
-            "missions": sorted(self._normalized_missions(request.missions)),
-            "max_products": request.max_products,
-            "schema_version": CACHE_SCHEMA_VERSION,
+            "target":
+            request.target.strip().casefold(),
+            "ra_deg":
+            request.ra_deg,
+            "dec_deg":
+            request.dec_deg,
+            "radius_deg":
+            request.radius_deg,
+            "missions":
+            sorted(self._normalized_missions(request.missions)),
+            "max_products":
+            request.max_products,
+            "schema_version":
+            CACHE_SCHEMA_VERSION,
         })
         cache_path = SEARCH_CACHE_ROOT / f"{cache_key}.json"
         cached = read_json(cache_path)
-        if (
-            not request.force_refresh
-            and isinstance(cached, dict)
-            and isinstance(cached.get("response"), dict)
-            and (
-                SEARCH_CACHE_TTL_SECONDS <= 0
-                or time.time() - cache_path.stat().st_mtime <= SEARCH_CACHE_TTL_SECONDS
-            )
-        ):
+        if (not request.force_refresh and isinstance(cached, dict)
+                and isinstance(cached.get("response"), dict)
+                and (SEARCH_CACHE_TTL_SECONDS <= 0 or time.time() -
+                     cache_path.stat().st_mtime <= SEARCH_CACHE_TTL_SECONDS)):
             response = dict(cached["response"])
             response["cache"] = {
                 "hit": True,
@@ -216,11 +218,12 @@ class LightCurveArchiveService:
             "product_count": len(rows),
             "products": rows,
         }
-        atomic_write_json(cache_path, {
-            "schema_version": CACHE_SCHEMA_VERSION,
-            "created_at": utc_now(),
-            "response": response,
-        })
+        atomic_write_json(
+            cache_path, {
+                "schema_version": CACHE_SCHEMA_VERSION,
+                "created_at": utc_now(),
+                "response": response,
+            })
         response["cache"] = {
             "hit": False,
             "key": cache_key,
@@ -236,13 +239,16 @@ class LightCurveArchiveService:
             return set()
         try:
             records = json.loads(products_file.read_text(encoding="utf-8"))
-            return {rec.get("product_uri") or rec.get("dataURI") or "" for rec in records}
+            return {
+                rec.get("product_uri") or rec.get("dataURI") or ""
+                for rec in records
+            }
         except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
             return set()
 
     def _find_existing_dataset(
-        self, target: str, product_uris: set[str]
-    ) -> dict[str, Any] | None:
+            self, target: str,
+            product_uris: set[str]) -> dict[str, Any] | None:
         """Return a validated dataset for this product set, including aliases."""
         dataset_key = stable_hash(sorted(product_uris))
         candidates = sorted(iter_dataset_dirs(), reverse=True)
@@ -251,7 +257,8 @@ class LightCurveArchiveService:
             if not isinstance(manifest, dict):
                 continue
             same_key = manifest.get("dataset_key") == dataset_key
-            if not same_key and self._product_uri_set_from_dir(run_dir) != product_uris:
+            if not same_key and self._product_uri_set_from_dir(
+                    run_dir) != product_uris:
                 continue
             valid, _, manifest = validate_dataset_dir(run_dir)
             if not valid or manifest is None:
@@ -265,7 +272,8 @@ class LightCurveArchiveService:
             return manifest
         return None
 
-    def _cached_product(self, product_uri: str) -> tuple[Path, dict[str, Any]] | None:
+    def _cached_product(
+            self, product_uri: str) -> tuple[Path, dict[str, Any]] | None:
         product_key = stable_hash(product_uri)
         product_dir = PRODUCT_CACHE_ROOT / product_key
         metadata = read_json(product_dir / "metadata.json")
@@ -278,7 +286,8 @@ class LightCurveArchiveService:
         if not path.exists() or not path.is_file():
             return None
         expected_size = metadata.get("size")
-        if expected_size is not None and path.stat().st_size != int(expected_size):
+        if expected_size is not None and path.stat().st_size != int(
+                expected_size):
             return None
         return path, metadata
 
@@ -350,12 +359,18 @@ class LightCurveArchiveService:
                     shutil.copy2(cached_path, staging_link)
                 final_link = final_dir / "products" / linked_name
                 manifest_records.append({
-                    "Local Path": str(final_link.relative_to(PROJECT_ROOT)),
-                    "Status": "COMPLETE",
-                    "size": metadata["size"],
-                    "sha256": metadata["sha256"],
-                    "product_key": metadata["product_key"],
-                    "product_uri": metadata["product_uri"],
+                    "Local Path":
+                    str(final_link.relative_to(PROJECT_ROOT)),
+                    "Status":
+                    "COMPLETE",
+                    "size":
+                    metadata["size"],
+                    "sha256":
+                    metadata["sha256"],
+                    "product_key":
+                    metadata["product_key"],
+                    "product_uri":
+                    metadata["product_uri"],
                 })
 
             manifest = {
@@ -365,14 +380,16 @@ class LightCurveArchiveService:
                 "last_accessed_at": utc_now(),
                 "target": request.target,
                 "radius_deg": request.radius_deg,
-                "missions": sorted(self._normalized_missions(request.missions)),
+                "missions":
+                sorted(self._normalized_missions(request.missions)),
                 "dataset_key": dataset_key,
                 "download_dir": str(final_dir.relative_to(PROJECT_ROOT)),
                 "selected_count": len(selected_records),
                 "manifest": manifest_records,
                 "deduplicated": False,
             }
-            atomic_write_json(staging_dir / "selected_products.json", selected_records)
+            atomic_write_json(staging_dir / "selected_products.json",
+                              selected_records)
             atomic_write_json(staging_dir / "manifest.json", manifest)
             os.replace(staging_dir, final_dir)
             return manifest
@@ -381,7 +398,7 @@ class LightCurveArchiveService:
             raise
 
     def _records_from_product_cache(
-        self, product_uris: set[str]
+            self, product_uris: set[str]
     ) -> list[tuple[Path, dict[str, Any]]] | None:
         products: list[tuple[Path, dict[str, Any]]] = []
         for uri in sorted(product_uris):
@@ -400,14 +417,20 @@ class LightCurveArchiveService:
             dataset_key = stable_hash(sorted(requested_uris))
             with cache_lock(f"dataset:{dataset_key}"):
                 if not request.force:
-                    existing = self._find_existing_dataset(request.target, requested_uris)
+                    existing = self._find_existing_dataset(
+                        request.target, requested_uris)
                     if existing is not None:
                         existing["deduplicated"] = True
-                        existing["cache"] = {"dataset_hit": True, "product_hits": len(requested_uris)}
+                        existing["cache"] = {
+                            "dataset_hit": True,
+                            "product_hits": len(requested_uris)
+                        }
                         return existing
-                    cached_products = self._records_from_product_cache(requested_uris)
+                    cached_products = self._records_from_product_cache(
+                        requested_uris)
                     if cached_products is not None:
-                        result = self._materialize_dataset(request, cached_products)
+                        result = self._materialize_dataset(
+                            request, cached_products)
                         result["cache"] = {
                             "dataset_hit": False,
                             "product_hits": len(cached_products),
@@ -446,7 +469,9 @@ class LightCurveArchiveService:
                 "Selected light-curve products were not found in MAST results")
 
         selected_uris = {
-            str(table_value(row, "dataURI") or table_value(row, "product_uri") or "")
+            str(
+                table_value(row, "dataURI") or table_value(row, "product_uri")
+                or "")
             for row in selected_products
         }
 
@@ -454,10 +479,14 @@ class LightCurveArchiveService:
         dataset_key = stable_hash(sorted(selected_uris))
         with cache_lock(f"dataset:{dataset_key}"):
             if not request.force:
-                existing = self._find_existing_dataset(request.target, selected_uris)
+                existing = self._find_existing_dataset(request.target,
+                                                       selected_uris)
                 if existing is not None:
                     existing["deduplicated"] = True
-                    existing["cache"] = {"dataset_hit": True, "product_hits": len(selected_uris)}
+                    existing["cache"] = {
+                        "dataset_hit": True,
+                        "product_hits": len(selected_uris)
+                    }
                     return existing
 
             cached_products: dict[str, tuple[Path, dict[str, Any]]] = {}
@@ -473,12 +502,16 @@ class LightCurveArchiveService:
             try:
                 if missing_indices:
                     uri_to_record = {
-                        str(record.get("dataURI") or record.get("product_uri") or ""): record
+                        str(
+                            record.get("dataURI") or record.get("product_uri") or ""):
+                        record
                         for record in selected_records
                     }
                     missing_mask = []
                     for row in selected_products:
-                        uri = str(table_value(row, "dataURI") or table_value(row, "product_uri") or "")
+                        uri = str(
+                            table_value(row, "dataURI")
+                            or table_value(row, "product_uri") or "")
                         missing_mask.append(uri not in cached_products)
                     missing_table = selected_products[missing_mask]
                     manifest_table = Observations.download_products(
@@ -487,27 +520,33 @@ class LightCurveArchiveService:
                         cache=True,
                     )
                     downloaded_paths = [
-                        Path(record.get("Local Path") or record.get("local_path") or "")
-                        for record in table_to_records(manifest_table)
-                        if str(record.get("Status") or record.get("status") or "").upper() in {"", "COMPLETE"}
+                        Path(
+                            record.get("Local Path")
+                            or record.get("local_path") or "")
+                        for record in table_to_records(manifest_table) if str(
+                            record.get("Status") or record.get("status")
+                            or "").upper() in {"", "COMPLETE"}
                     ]
                     for uri in sorted(selected_uris - set(cached_products)):
                         record = uri_to_record[uri]
                         filename = str(record.get("productFilename") or "")
                         source_path = next(
-                            (path for path in downloaded_paths if path.exists() and path.name == filename),
+                            (path for path in downloaded_paths
+                             if path.exists() and path.name == filename),
                             None,
                         )
                         if source_path is None:
                             raise HTTPException(
                                 status_code=502,
-                                detail=f"MAST download did not produce {filename or uri}",
+                                detail=
+                                f"MAST download did not produce {filename or uri}",
                             )
                         cached_products[uri] = self._store_product(
-                            uri, record, source_path, force=request.force
-                        )
+                            uri, record, source_path, force=request.force)
 
-                ordered_products = [cached_products[uri] for uri in sorted(selected_uris)]
+                ordered_products = [
+                    cached_products[uri] for uri in sorted(selected_uris)
+                ]
                 result = self._materialize_dataset(request, ordered_products)
                 result["cache"] = {
                     "dataset_hit": False,

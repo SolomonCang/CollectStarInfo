@@ -54,14 +54,15 @@ def _scan_target_results() -> Iterator[dict[str, Any]]:
         if path.is_dir():
             continue
         payload = read_json(path)
-        if not isinstance(payload, dict) or not isinstance(payload.get("target"), dict):
+        if not isinstance(payload, dict) or not isinstance(
+                payload.get("target"), dict):
             continue
         target = payload["target"]
-        display_name = target.get("resolved_target") or target.get("query_target") or path.stem
+        display_name = target.get("resolved_target") or target.get(
+            "query_target") or path.stem
         size = path.stat().st_size
         created_at = payload.get("generated_at") or datetime.fromtimestamp(
-            path.stat().st_mtime, tz=timezone.utc
-        ).isoformat()
+            path.stat().st_mtime, tz=timezone.utc).isoformat()
         tags: list[str] = []
         ttype = target.get("target_type", "")
         if ttype:
@@ -83,10 +84,14 @@ def _scan_target_results() -> Iterator[dict[str, Any]]:
             "created_at": created_at,
             "tags": tags,
             "metadata": {
-                "target_type": ttype or None,
-                "ra_deg": simbad.get("ra_deg"),
-                "dec_deg": simbad.get("dec_deg"),
-                "reference_count": len(target.get("literature_references", []) or []),
+                "target_type":
+                ttype or None,
+                "ra_deg":
+                simbad.get("ra_deg"),
+                "dec_deg":
+                simbad.get("dec_deg"),
+                "reference_count":
+                len(target.get("literature_references", []) or []),
             },
         }
 
@@ -100,8 +105,7 @@ def _scan_lightcurve_datasets() -> Iterator[dict[str, Any]]:
         rel_path = str(dataset_dir.relative_to(PROJECT_ROOT))
         size = unique_storage_size(iter([dataset_dir]))
         created_at = manifest.get("generated_at") or datetime.fromtimestamp(
-            dataset_dir.stat().st_mtime, tz=timezone.utc
-        ).isoformat()
+            dataset_dir.stat().st_mtime, tz=timezone.utc).isoformat()
         entries = manifest.get("manifest", [])
         missions: list[str] = []
         seen: set[str] = set()
@@ -124,18 +128,29 @@ def _scan_lightcurve_datasets() -> Iterator[dict[str, Any]]:
         products = read_json(products_file, [])
         target_name = ""
         if products:
-            target_name = products[0].get("target_name", "") if isinstance(products, list) and products else ""
+            target_name = products[0].get("target_name", "") if isinstance(
+                products, list) and products else ""
 
         yield {
-            "id": f"lc_{dataset_id[:24]}",
-            "type": "lightcurve_dataset",
-            "display_name": target_name or manifest.get("target_name") or dataset_dir.parent.name,
-            "source": f"MAST/{'/'.join(missions)}" if missions else "MAST",
-            "file_path": rel_path,
-            "size_bytes": size,
-            "created_at": created_at,
-            "tags": tags,
-            "valid": ok,
+            "id":
+            f"lc_{dataset_id[:24]}",
+            "type":
+            "lightcurve_dataset",
+            "display_name":
+            target_name or manifest.get("target_name")
+            or dataset_dir.parent.name,
+            "source":
+            f"MAST/{'/'.join(missions)}" if missions else "MAST",
+            "file_path":
+            rel_path,
+            "size_bytes":
+            size,
+            "created_at":
+            created_at,
+            "tags":
+            tags,
+            "valid":
+            ok,
             "metadata": {
                 "missions": missions,
                 "point_count": point_count,
@@ -165,7 +180,8 @@ def _load_catalog() -> dict[str, Any]:
     """Return current catalog, rebuilding if missing or stale."""
     if CATALOG_PATH.exists():
         catalog = read_json(CATALOG_PATH, {})
-        if isinstance(catalog, dict) and catalog.get("version") == CATALOG_VERSION:
+        if isinstance(catalog,
+                      dict) and catalog.get("version") == CATALOG_VERSION:
             return catalog
     return _rebuild_catalog()
 
@@ -212,22 +228,28 @@ class CatalogService:
         if entry_type:
             entries = [e for e in entries if e.get("type") == entry_type]
         if source:
-            entries = [e for e in entries if source.lower() in (e.get("source") or "").lower()]
+            entries = [
+                e for e in entries
+                if source.lower() in (e.get("source") or "").lower()
+            ]
         if tags:
             tag_set = {t.lower() for t in tags}
-            entries = [e for e in entries if tag_set & {t.lower() for t in e.get("tags", [])}]
+            entries = [
+                e for e in entries
+                if tag_set & {t.lower()
+                              for t in e.get("tags", [])}
+            ]
         if search:
             q = search.lower()
             entries = [
-                e
-                for e in entries
-                if q in (e.get("display_name") or "").lower()
-                or q in (e.get("source") or "").lower()
-                or any(q in t.lower() for t in e.get("tags", []))
+                e for e in entries
+                if q in (e.get("display_name") or "").lower() or q in (
+                    e.get("source") or "").lower() or any(
+                        q in t.lower() for t in e.get("tags", []))
             ]
 
         total = len(entries)
-        page = entries[offset : offset + limit]
+        page = entries[offset:offset + limit]
         return {
             "total": total,
             "offset": offset,
@@ -240,7 +262,8 @@ class CatalogService:
         for entry in catalog.get("entries", []):
             if entry.get("id") == entry_id:
                 return entry
-        raise HTTPException(status_code=404, detail=f"Entry not found: {entry_id}")
+        raise HTTPException(status_code=404,
+                            detail=f"Entry not found: {entry_id}")
 
     def delete_entry(self, entry_id: str) -> dict[str, Any]:
         catalog = self._ensure_fresh()
@@ -250,10 +273,12 @@ class CatalogService:
                 target_entry = entry
                 break
         if target_entry is None:
-            raise HTTPException(status_code=404, detail=f"Entry not found: {entry_id}")
+            raise HTTPException(status_code=404,
+                                detail=f"Entry not found: {entry_id}")
 
         file_path = Path(target_entry["file_path"])
-        abs_path = file_path if file_path.is_absolute() else PROJECT_ROOT / file_path
+        abs_path = file_path if file_path.is_absolute(
+        ) else PROJECT_ROOT / file_path
 
         removed_bytes = 0
         if abs_path.exists():
@@ -296,10 +321,18 @@ class CatalogService:
         for eid in entry_ids:
             try:
                 r = self.delete_entry(eid)
-                results.append({"id": eid, "status": "deleted", "removed_bytes": r["removed_bytes"]})
+                results.append({
+                    "id": eid,
+                    "status": "deleted",
+                    "removed_bytes": r["removed_bytes"]
+                })
                 total_removed += r["removed_bytes"]
             except HTTPException as exc:
-                results.append({"id": eid, "status": "error", "detail": exc.detail})
+                results.append({
+                    "id": eid,
+                    "status": "error",
+                    "detail": exc.detail
+                })
         catalog = self._ensure_fresh()
         return {
             "results": results,
@@ -345,7 +378,8 @@ class CatalogService:
                 if group["target_entry"] is None:  # keep first
                     group["target_entry"] = entry
                 else:
-                    group["total_size_bytes"] += entry.get("size_bytes", 0) or 0
+                    group["total_size_bytes"] += entry.get("size_bytes",
+                                                           0) or 0
             elif entry.get("type") == "lightcurve_dataset":
                 group["lc_entries"].append(entry)
 
@@ -353,7 +387,8 @@ class CatalogService:
         stars: list[dict[str, Any]] = []
         for key in order:
             g = groups[key]
-            entry_count = (1 if g["target_entry"] else 0) + len(g["lc_entries"])
+            entry_count = (1 if g["target_entry"] else 0) + len(
+                g["lc_entries"])
             stars.append({
                 "name": g["name"],
                 "normalized": g["normalized"],
@@ -370,17 +405,13 @@ class CatalogService:
             q = search.lower()
             stars = [
                 s for s in stars
-                if q in s["name"].lower()
-                or (s["target_entry"] and q in (s["target_entry"].get("source") or "").lower())
-                or any(
-                    q in e.get("source", "").lower()
-                    for e in s["lc_entries"]
-                )
-                or any(
-                    q in t.lower()
-                    for e in ([s["target_entry"]] if s["target_entry"] else []) + s["lc_entries"]
-                    for t in e.get("tags", [])
-                )
+                if q in s["name"].lower() or (s["target_entry"] and q in (
+                    s["target_entry"].get("source") or "").lower()) or any(
+                        q in e.get("source", "").lower()
+                        for e in s["lc_entries"])
+                or any(q in t.lower() for e in
+                       ([s["target_entry"]] if s["target_entry"] else []) +
+                       s["lc_entries"] for t in e.get("tags", []))
             ]
 
         # filter: source
@@ -388,12 +419,14 @@ class CatalogService:
             qs = source.lower()
             stars = [
                 s for s in stars
-                if (s["target_entry"] and qs in (s["target_entry"].get("source") or "").lower())
-                or any(qs in e.get("source", "").lower() for e in s["lc_entries"])
+                if (s["target_entry"] and qs in
+                    (s["target_entry"].get("source") or "").lower()) or any(
+                        qs in e.get("source", "").lower()
+                        for e in s["lc_entries"])
             ]
 
         total = len(stars)
-        page = stars[offset : offset + limit]
+        page = stars[offset:offset + limit]
         return {
             "total": total,
             "offset": offset,
@@ -413,14 +446,16 @@ class CatalogService:
             if _normalize_star_name(e.get("display_name", "")) == key
         ]
         if not to_delete:
-            raise HTTPException(status_code=404, detail=f"No data found for star: {star_name}")
+            raise HTTPException(status_code=404,
+                                detail=f"No data found for star: {star_name}")
 
         total_removed = 0
         display_name = to_delete[0].get("display_name", star_name)
         deleted_ids: list[str] = []
         for entry in to_delete:
             file_path = Path(entry["file_path"])
-            abs_path = file_path if file_path.is_absolute() else PROJECT_ROOT / file_path
+            abs_path = file_path if file_path.is_absolute(
+            ) else PROJECT_ROOT / file_path
             if abs_path.exists():
                 if abs_path.is_dir():
                     from .lightcurve_cache_service import unique_storage_size

@@ -152,7 +152,8 @@ def lightcurve_cache_stats() -> dict:
 
 @app.post("/api/lightcurves/cache/verify")
 def verify_lightcurve_cache(request: LightCurveCacheVerifyRequest) -> dict:
-    return lightcurve_cache_service.verify(deep=request.deep, repair=request.repair)
+    return lightcurve_cache_service.verify(deep=request.deep,
+                                           repair=request.repair)
 
 
 @app.post("/api/lightcurves/cache/cleanup")
@@ -177,6 +178,7 @@ def analyze_lightcurve_dataset(
 
 
 # ── Catalog / Data Manager ────────────────────────────────────────
+
 
 @app.get("/api/catalog/stats")
 def catalog_stats() -> dict:
@@ -212,10 +214,12 @@ def catalog_batch_delete(request: CatalogBatchDeleteRequest) -> dict:
 
 @app.get("/api/catalog/stars")
 def catalog_list_stars(
-    search: str | None = Query(default=None, description="Search star name or source"),
-    source: str | None = Query(default=None, description="Filter by data source"),
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=500),
+        search: str | None = Query(default=None,
+                                   description="Search star name or source"),
+        source: str | None = Query(default=None,
+                                   description="Filter by data source"),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=50, ge=1, le=500),
 ) -> dict:
     return catalog_service.list_stars(
         search=search,

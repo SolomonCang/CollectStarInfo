@@ -33,7 +33,10 @@ class LightCurveArchiveSearchRequest(BaseModel):
 class LightCurveArchiveDownloadRequest(LightCurveArchiveSearchRequest):
     product_uris: list[str] = Field(default_factory=list)
     max_downloads: int = Field(default=10, ge=1, le=100)
-    force: bool = Field(default=False, description="Force re-download even if an identical dataset already exists")
+    force: bool = Field(
+        default=False,
+        description=
+        "Force re-download even if an identical dataset already exists")
 
 
 class LightCurvePoint(BaseModel):
@@ -75,9 +78,11 @@ class LightCurveDatasetAnalysisRequest(LightCurveDatasetRequest):
 
 
 class LightCurveCacheVerifyRequest(BaseModel):
-    deep: bool = Field(default=False, description="Verify stored SHA-256 checksums")
+    deep: bool = Field(default=False,
+                       description="Verify stored SHA-256 checksums")
     repair: bool = Field(
-        default=False, description="Mark invalid manifests so they cannot be reused")
+        default=False,
+        description="Mark invalid manifests so they cannot be reused")
 
 
 class LightCurveCacheCleanupRequest(BaseModel):
@@ -100,10 +105,14 @@ class LightCurveAnalysisRequest(BaseModel):
 
 # ── Catalog / Data Manager ────────────────────────────────────────
 
+
 class CatalogListRequest(BaseModel):
-    entry_type: str | None = Field(default=None, description="Filter: target_result | lightcurve_dataset")
-    source: str | None = Field(default=None, description="Filter by source substring")
-    search: str | None = Field(default=None, description="Search in display_name, source, tags")
+    entry_type: str | None = Field(
+        default=None, description="Filter: target_result | lightcurve_dataset")
+    source: str | None = Field(default=None,
+                               description="Filter by source substring")
+    search: str | None = Field(
+        default=None, description="Search in display_name, source, tags")
     tags: list[str] = Field(default_factory=list)
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=50, ge=1, le=500)
