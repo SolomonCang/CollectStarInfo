@@ -22,6 +22,12 @@ export default function LightCurvePage({
   archiveBusy,
   downloadResult,
   forceDownload,
+  forceSearchRefresh,
+  cacheStats,
+  cacheBusy,
+  cacheMessage,
+  cleanupAgeDays,
+  cleanupMaxSizeMb,
   datasets,
   selectedDatasetDir,
   datasetBusy,
@@ -56,6 +62,9 @@ export default function LightCurvePage({
   setPhasePeriod,
   setSelectedDatasetDir,
   setForceDownload,
+  setForceSearchRefresh,
+  setCleanupAgeDays,
+  setCleanupMaxSizeMb,
   toggleProduct,
   handleSpectrumClick,
   handleAnalyze,
@@ -65,6 +74,9 @@ export default function LightCurvePage({
   handleTargetQuery,
   handleArchiveSearch,
   handleArchiveDownload,
+  handleCacheVerify,
+  handleCacheCleanup,
+  handleDeleteDataset,
 }) {
   const searchDisabled = datasetBusy || (!selectedDatasetDir && points.length < 3);
 
@@ -86,12 +98,23 @@ export default function LightCurvePage({
           archiveBusy={archiveBusy}
           downloadResult={downloadResult}
           forceDownload={forceDownload}
+          forceSearchRefresh={forceSearchRefresh}
+          cacheStats={cacheStats}
+          cacheBusy={cacheBusy}
+          cacheMessage={cacheMessage}
+          cleanupAgeDays={cleanupAgeDays}
+          cleanupMaxSizeMb={cleanupMaxSizeMb}
           selectedDataset={selectedDataset}
           hasTarget={!!targetResult && hasTargetCoordinates}
           onSearch={handleArchiveSearch}
           onDownload={handleArchiveDownload}
           onToggleProduct={toggleProduct}
           onForceDownloadChange={setForceDownload}
+          onForceSearchRefreshChange={setForceSearchRefresh}
+          onCleanupAgeChange={setCleanupAgeDays}
+          onCleanupSizeChange={setCleanupMaxSizeMb}
+          onCacheVerify={handleCacheVerify}
+          onCacheCleanup={handleCacheCleanup}
         />
 
         <DatasetSelector
@@ -101,6 +124,8 @@ export default function LightCurvePage({
           onAnalyze={handleAnalyzeDownloadedDataset}
           onFile={handleFile}
           datasetBusy={datasetBusy}
+          cacheBusy={cacheBusy}
+          onDelete={handleDeleteDataset}
         />
 
         <AnalysisSettings
@@ -143,6 +168,10 @@ export default function LightCurvePage({
             <Metric label="Time span (d)" value={analysis?.time_span?.toPrecision?.(7)} />
             <Metric label="Best period (d)" value={analysis?.period_search?.best_period?.toPrecision?.(7)} />
             <Metric label="FAP" value={analysis?.period_search?.false_alarm_probability?.toExponential?.(2)} />
+            <Metric
+              label="Cache"
+              value={analysis?.cache?.analysis_hit ? "analysis hit" : analysis?.cache?.derived_hit ? "curve hit" : "computed"}
+            />
           </div>
         </div>
 

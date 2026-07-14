@@ -26,6 +26,8 @@ class LightCurveArchiveSearchRequest(BaseModel):
     missions: list[str] = Field(
         default_factory=lambda: ["TESS", "Kepler", "K2"])
     max_products: int = Field(default=80, ge=1, le=500)
+    force_refresh: bool = Field(
+        default=False, description="Bypass the short-lived MAST search cache")
 
 
 class LightCurveArchiveDownloadRequest(LightCurveArchiveSearchRequest):
@@ -70,6 +72,23 @@ class LightCurveDatasetAnalysisRequest(LightCurveDatasetRequest):
     detrend: DetrendOptions = Field(default_factory=DetrendOptions)
     period_search: PeriodSearchOptions = Field(
         default_factory=PeriodSearchOptions)
+
+
+class LightCurveCacheVerifyRequest(BaseModel):
+    deep: bool = Field(default=False, description="Verify stored SHA-256 checksums")
+    repair: bool = Field(
+        default=False, description="Mark invalid manifests so they cannot be reused")
+
+
+class LightCurveCacheCleanupRequest(BaseModel):
+    max_age_days: float | None = Field(default=None, gt=0)
+    max_size_mb: float | None = Field(default=None, gt=0)
+    dry_run: bool = True
+    remove_unreferenced_products: bool = True
+
+
+class LightCurveDatasetDeleteRequest(BaseModel):
+    download_dir: str = Field(min_length=1)
 
 
 class LightCurveAnalysisRequest(BaseModel):

@@ -1001,6 +1001,60 @@ label {
   list-style: none;
 }
 
+/* ── Light-curve cache maintenance ── */
+
+.cache-maintenance {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color, #d7ddd9);
+}
+
+.cache-summary,
+.cache-actions,
+.cache-limits {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cache-summary span {
+  color: var(--muted-color, #66756d);
+  font-size: 0.82rem;
+}
+
+.cache-summary em {
+  color: #a13d31;
+  font-size: 0.78rem;
+}
+
+.cache-limits label {
+  display: grid;
+  gap: 3px;
+  flex: 1 1 110px;
+  font-size: 0.75rem;
+  color: var(--muted-color, #66756d);
+}
+
+.cache-limits input {
+  width: 100%;
+}
+
+.cache-actions button {
+  flex: 1 1 auto;
+}
+
+.danger-button {
+  border-color: #b95a4f;
+  color: #9f2d20;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #fff0ed;
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 920px) {

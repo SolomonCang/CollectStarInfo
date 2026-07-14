@@ -20,6 +20,14 @@ const initialState = {
   archiveBusy: false,
   downloadResult: null,
   forceDownload: false,
+  forceSearchRefresh: false,
+
+  // Cache maintenance
+  cacheStats: null,
+  cacheBusy: false,
+  cacheMessage: "",
+  cleanupAgeDays: "90",
+  cleanupMaxSizeMb: "2048",
 
   // Datasets
   datasets: [],
@@ -95,7 +103,7 @@ function reducer(state, action) {
       return { ...state, archiveBusy: true, downloadResult: null, error: "" };
 
     case "SET_ARCHIVE_ERROR":
-      return { ...state, archiveBusy: false, error: action.payload };
+      return { ...state, archiveBusy: false, cacheBusy: false, error: action.payload };
 
     case "SET_DOWNLOAD_RESULT":
       return {
@@ -112,6 +120,7 @@ function reducer(state, action) {
         ...state,
         datasets: action.payload.datasets,
         selectedDatasetDir: action.payload.selectedDir ?? state.selectedDatasetDir,
+        analysis: action.payload.datasets.length ? state.analysis : null,
       };
 
     case "SET_SELECTED_DATASET":
@@ -130,6 +139,21 @@ function reducer(state, action) {
 
     case "SET_FORCE_DOWNLOAD":
       return { ...state, forceDownload: action.payload };
+    case "SET_FORCE_SEARCH_REFRESH":
+      return { ...state, forceSearchRefresh: action.payload };
+    case "SET_CACHE_BUSY":
+      return { ...state, cacheBusy: true, cacheMessage: "", error: "" };
+    case "SET_CACHE_RESULT":
+      return {
+        ...state,
+        cacheBusy: false,
+        cacheStats: action.payload.stats ?? state.cacheStats,
+        cacheMessage: action.payload.message ?? "",
+      };
+    case "SET_CLEANUP_AGE":
+      return { ...state, cleanupAgeDays: action.payload };
+    case "SET_CLEANUP_SIZE":
+      return { ...state, cleanupMaxSizeMb: action.payload };
 
     case "SET_MIN_PERIOD":
       return { ...state, minPeriod: action.payload };
@@ -256,6 +280,9 @@ export function useLightCurveState() {
   const setPhasePeriod = useCallback((val) => dispatch({ type: "SET_PHASE_PERIOD", payload: val }), []);
   const setSelectedDatasetDir = useCallback((val) => dispatch({ type: "SET_SELECTED_DATASET", payload: val }), []);
   const setForceDownload = useCallback((val) => dispatch({ type: "SET_FORCE_DOWNLOAD", payload: val }), []);
+  const setForceSearchRefresh = useCallback((val) => dispatch({ type: "SET_FORCE_SEARCH_REFRESH", payload: val }), []);
+  const setCleanupAgeDays = useCallback((val) => dispatch({ type: "SET_CLEANUP_AGE", payload: val }), []);
+  const setCleanupMaxSizeMb = useCallback((val) => dispatch({ type: "SET_CLEANUP_SIZE", payload: val }), []);
   const setError = useCallback((val) => dispatch({ type: "SET_ERROR", payload: val }), []);
   const setPeriodogramDomain = useCallback((val) => dispatch({ type: "SET_PERIODOGRAM_DOMAIN", payload: val }), []);
   const resetZoom = useCallback(() => dispatch({ type: "RESET_ZOOM" }), []);
@@ -369,6 +396,9 @@ export function useLightCurveState() {
     setPhasePeriod,
     setSelectedDatasetDir,
     setForceDownload,
+    setForceSearchRefresh,
+    setCleanupAgeDays,
+    setCleanupMaxSizeMb,
     setError,
     setPoints,
     setProgressSteps,

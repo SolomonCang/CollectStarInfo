@@ -6,12 +6,23 @@ export default function ArchivePanel({
   archiveBusy,
   downloadResult,
   forceDownload,
+  forceSearchRefresh,
+  cacheStats,
+  cacheBusy,
+  cacheMessage,
+  cleanupAgeDays,
+  cleanupMaxSizeMb,
   selectedDataset,
   hasTarget,
   onSearch,
   onDownload,
   onToggleProduct,
   onForceDownloadChange,
+  onForceSearchRefreshChange,
+  onCleanupAgeChange,
+  onCleanupSizeChange,
+  onCacheVerify,
+  onCacheCleanup,
 }) {
   const checkedSet = new Set(selectedProducts);
   const displayProducts = archiveProducts.slice(0, 12);
@@ -22,6 +33,14 @@ export default function ArchivePanel({
       <button type="button" onClick={onSearch} disabled={!hasTarget || archiveBusy}>
         {archiveBusy ? "处理中..." : "检索 MAST 光变曲线"}
       </button>
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={forceSearchRefresh}
+          onChange={(event) => onForceSearchRefreshChange(event.target.checked)}
+        />
+        刷新检索缓存
+      </label>
       <div className="download-actions">
         <button
           type="button"
@@ -80,6 +99,30 @@ export default function ArchivePanel({
           {selectedDataset.csv_path && <span>CSV: <strong>{selectedDataset.csv_path}</strong></span>}
         </div>
       )}
+
+      <div className="cache-maintenance">
+        <div className="cache-summary">
+          <strong>缓存</strong>
+          <span>{cacheStats ? `${cacheStats.megabytes_used} MB · ${cacheStats.datasets} 数据集` : "读取中"}</span>
+          {cacheStats?.invalid_datasets ? <em>{cacheStats.invalid_datasets} 个异常</em> : null}
+        </div>
+        <div className="cache-limits">
+          <label>
+            保留天数
+            <input type="number" min="1" value={cleanupAgeDays} onChange={(event) => onCleanupAgeChange(event.target.value)} />
+          </label>
+          <label>
+            上限 MB
+            <input type="number" min="1" value={cleanupMaxSizeMb} onChange={(event) => onCleanupSizeChange(event.target.value)} />
+          </label>
+        </div>
+        <div className="cache-actions">
+          <button type="button" onClick={onCacheVerify} disabled={cacheBusy}>校验</button>
+          <button type="button" onClick={() => onCacheCleanup(true)} disabled={cacheBusy}>预览清理</button>
+          <button type="button" className="danger-button" onClick={() => onCacheCleanup(false)} disabled={cacheBusy}>执行清理</button>
+        </div>
+        {cacheMessage ? <div className="muted-text">{cacheMessage}</div> : null}
+      </div>
     </div>
   );
 }

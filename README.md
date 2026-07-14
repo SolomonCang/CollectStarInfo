@@ -42,15 +42,31 @@ npm run dev
 
 目标查询默认会优先载入 `results/<target>.json` 中已有信息，避免重复访问外部数据库；在前端勾选“强制重新检索”后，会重新调用 SIMBAD/Gaia/MAST/DeepSeek，并把新的 JSON 写回 `results/`。
 
-MAST 光变曲线下载会写入：
+MAST 光变曲线使用三层缓存。用户可见的数据集写入：
 
 ```text
-data/lightcurves/<target>/<YYYYMMDDTHHMMSSZ>/
+data/lightcurves/<target>/<timestamp>-<uuid>/
 ```
 
-其中包含下载的 FITS 产品、`selected_products.json`、`manifest.json` 和后端自动转换出的 `lightcurve.csv`。`results/` 继续只作为目标查询报告目录，不再混放下载数据。
+其中包含产品硬链接（文件系统不支持时自动复制）、`selected_products.json`、带完整性信息的 `manifest.json` 和后端自动转换出的 `lightcurve.csv`。`results/` 继续只作为目标查询报告目录，不再混放下载数据。旧版时间戳目录和 manifest 保持兼容，无需手动迁移。
+
+内部共享缓存位于 `data/lightcurves/_cache/`：
+
+- `search/`：按目标/坐标、半径、任务和数量参数缓存 MAST 检索结果，默认 TTL 为 6 小时；可通过 `LIGHTCURVE_SEARCH_CACHE_TTL` 修改。
+- `products/`：按产品 URI 缓存单个 FITS，并保存文件大小和 SHA-256；不同目标别名和产品组合可以共享同一文件。
+- `derived/`：按 FITS 指纹、flux column、质量过滤规则缓存标准化数组。
+- `analysis/`：按数据指纹、降采样、去趋势和周期搜索参数缓存分析结果。
+
+数据集下载使用文件锁、`.partial` 临时目录和原子重命名。缓存命中前会检查 manifest、下载状态、文件存在性和大小；深度校验还会检查 SHA-256。CSV 只在输入或处理参数变化时重新生成。
 
 下载完成后，前端会自动选中新数据集；也可以在独立“光变曲线”页面从“已下载数据集”下拉框选择历史下载。后端会读取该目录下的 `manifest.json` 和 FITS 文件，优先使用 `PDCSAP_FLUX`，应用 `QUALITY == 0` 过滤，生成 `time,flux,flux_error` CSV，并送入去趋势、Lomb-Scargle 周期搜索、频谱图和相位折叠分析。相位折叠周期可使用最佳周期，也可从频谱图点击选择或手动输入。
+
+光变曲线页面同时提供缓存占用统计、完整性校验、按保留天数/容量清理预览、执行清理和单数据集删除。清理 API 默认为 `dry_run=true`；共享产品、派生结果和分析结果只有在不再被任何数据集引用时才会回收。相关接口为：
+
+- `GET /api/lightcurves/cache/stats`
+- `POST /api/lightcurves/cache/verify`
+- `POST /api/lightcurves/cache/cleanup`
+- `POST /api/lightcurves/datasets/delete`
 
 也可以在项目根目录用启动器一次性启动前后端并打开网页：
 

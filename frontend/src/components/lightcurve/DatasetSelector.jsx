@@ -7,6 +7,8 @@ export default function DatasetSelector({
   onAnalyze,
   onFile,
   datasetBusy,
+  cacheBusy,
+  onDelete,
 }) {
   return (
     <div className="dataset-section">
@@ -54,6 +56,14 @@ export default function DatasetSelector({
         disabled={!selectedDir || datasetBusy}
       >
         {datasetBusy ? "分析中..." : "分析选中下载数据"}
+      </button>
+      <button
+        type="button"
+        className="danger-button"
+        onClick={() => onDelete(selectedDir)}
+        disabled={!selectedDir || datasetBusy || cacheBusy}
+      >
+        删除选中数据集
       </button>
       <label>
         CSV / whitespace: time flux [err]

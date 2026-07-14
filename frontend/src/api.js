@@ -54,6 +54,31 @@ export function listLightCurveDatasets(target) {
   return request(`/api/lightcurves/datasets${params}`);
 }
 
+export function deleteLightCurveDataset(downloadDir) {
+  return request("/api/lightcurves/datasets/delete", {
+    method: "POST",
+    body: JSON.stringify({ download_dir: downloadDir }),
+  });
+}
+
+export function getLightCurveCacheStats() {
+  return request("/api/lightcurves/cache/stats");
+}
+
+export function verifyLightCurveCache(payload = {}) {
+  return request("/api/lightcurves/cache/verify", {
+    method: "POST",
+    body: JSON.stringify({ deep: false, repair: false, ...payload }),
+  });
+}
+
+export function cleanupLightCurveCache(payload) {
+  return request("/api/lightcurves/cache/cleanup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function analyzeDownloadedLightCurve(payload) {
   return request("/api/lightcurves/analyze-dataset", {
     method: "POST",

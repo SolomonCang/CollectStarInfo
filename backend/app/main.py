@@ -7,7 +7,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .schemas import LightCurveAnalysisRequest, LightCurveArchiveDownloadRequest, LightCurveArchiveSearchRequest, LightCurveDatasetAnalysisRequest, LightCurveDatasetRequest, LiteratureResearchRequest, TargetQueryRequest
+from .schemas import LightCurveAnalysisRequest, LightCurveArchiveDownloadRequest, LightCurveArchiveSearchRequest, LightCurveCacheCleanupRequest, LightCurveCacheVerifyRequest, LightCurveDatasetAnalysisRequest, LightCurveDatasetDeleteRequest, LightCurveDatasetRequest, LiteratureResearchRequest, TargetQueryRequest
+from .services.lightcurve_cache_service import LightCurveCacheService
 from .services.lightcurve_archive_service import LightCurveArchiveService
 from .services.lightcurve_fits_service import LightCurveFitsService
 from .services.lightcurve_service import analyze_light_curve
@@ -82,6 +83,7 @@ app.add_middleware(
 target_service = TargetSearchService()
 lightcurve_archive_service = LightCurveArchiveService()
 lightcurve_fits_service = LightCurveFitsService()
+lightcurve_cache_service = LightCurveCacheService()
 
 
 @app.get("/api/health")
@@ -123,6 +125,31 @@ def download_lightcurves(request: LightCurveArchiveDownloadRequest) -> dict:
 @app.get("/api/lightcurves/datasets")
 def list_lightcurve_datasets(target: str | None = None) -> dict:
     return lightcurve_fits_service.list_datasets(target=target)
+
+
+@app.post("/api/lightcurves/datasets/delete")
+def delete_lightcurve_dataset(request: LightCurveDatasetDeleteRequest) -> dict:
+    return lightcurve_cache_service.delete_dataset(request.download_dir)
+
+
+@app.get("/api/lightcurves/cache/stats")
+def lightcurve_cache_stats() -> dict:
+    return lightcurve_cache_service.stats()
+
+
+@app.post("/api/lightcurves/cache/verify")
+def verify_lightcurve_cache(request: LightCurveCacheVerifyRequest) -> dict:
+    return lightcurve_cache_service.verify(deep=request.deep, repair=request.repair)
+
+
+@app.post("/api/lightcurves/cache/cleanup")
+def cleanup_lightcurve_cache(request: LightCurveCacheCleanupRequest) -> dict:
+    return lightcurve_cache_service.cleanup(
+        max_age_days=request.max_age_days,
+        max_size_mb=request.max_size_mb,
+        dry_run=request.dry_run,
+        remove_unreferenced_products=request.remove_unreferenced_products,
+    )
 
 
 @app.post("/api/lightcurves/load")

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from astropy.io import fits
@@ -10,7 +12,22 @@ from fastapi import HTTPException
 import numpy as np
 
 from ..schemas import LightCurveAnalysisRequest, LightCurveDatasetAnalysisRequest, LightCurveDatasetRequest, LightCurvePoint
-from .lightcurve_archive_service import DATA_ROOT, PROJECT_ROOT, safe_target_name
+from .lightcurve_archive_service import safe_target_name
+from .lightcurve_cache_service import (
+    ANALYSIS_CACHE_ROOT,
+    CACHE_SCHEMA_VERSION,
+    DATA_ROOT,
+    DERIVED_CACHE_ROOT,
+    PROJECT_ROOT,
+    atomic_write_json,
+    cache_lock,
+    read_json,
+    resolve_data_path,
+    stable_hash,
+    unique_storage_size,
+    utc_now,
+    validate_dataset_dir,
+)
 from .lightcurve_service import analyze_light_curve
 
 FLUX_CANDIDATES = (
@@ -20,21 +37,12 @@ FLUX_CANDIDATES = (
     "DET_FLUX",
     "FLUX",
 )
+DERIVED_CACHE_VERSION = 1
+ANALYSIS_CACHE_VERSION = 1
 
 
 def _resolve_data_path(download_dir: str) -> Path:
-    raw_path = Path(download_dir)
-    candidate = raw_path if raw_path.is_absolute() else PROJECT_ROOT / raw_path
-    resolved = candidate.resolve()
-    data_root = DATA_ROOT.resolve()
-    if resolved != data_root and data_root not in resolved.parents:
-        raise HTTPException(
-            status_code=400,
-            detail="download_dir must be under data/lightcurves")
-    if not resolved.exists() or not resolved.is_dir():
-        raise HTTPException(status_code=404,
-                            detail=f"download_dir not found: {download_dir}")
-    return resolved
+    return resolve_data_path(download_dir)
 
 
 def _manifest_paths(download_dir: Path) -> list[Path]:
@@ -47,7 +55,8 @@ def _manifest_paths(download_dir: Path) -> list[Path]:
             status = str(item.get("Status") or item.get("status")
                          or "").upper()
             if local_path and status in {"", "COMPLETE"}:
-                paths.append(Path(local_path))
+                path = Path(local_path)
+                paths.append(path if path.is_absolute() else PROJECT_ROOT / path)
     if not paths:
         paths.extend(download_dir.rglob("*.fits"))
         paths.extend(download_dir.rglob("*.fits.gz"))
@@ -149,6 +158,132 @@ def _read_fits_points(
 
 class LightCurveFitsService:
 
+    def _record_cache_usage(
+        self,
+        download_dir: Path,
+        *,
+        source_fingerprint: str,
+        processing_key: str | None = None,
+        analysis_key: str | None = None,
+    ) -> None:
+        manifest_path = download_dir / "manifest.json"
+        if not manifest_path.exists():
+            return
+        with cache_lock(f"manifest:{download_dir}"):
+            manifest = read_json(manifest_path, {})
+            if not isinstance(manifest, dict):
+                return
+            manifest["source_fingerprint"] = source_fingerprint
+            manifest["last_accessed_at"] = utc_now()
+            if processing_key:
+                keys = set(manifest.get("derived_processing_keys", []))
+                keys.add(processing_key)
+                manifest["derived_processing_keys"] = sorted(keys)
+            if analysis_key:
+                keys = set(manifest.get("analysis_keys", []))
+                keys.add(analysis_key)
+                manifest["analysis_keys"] = sorted(keys)
+            atomic_write_json(manifest_path, manifest)
+
+    def _dataset_fingerprint(self, download_dir: Path) -> str:
+        manifest = read_json(download_dir / "manifest.json", {})
+        if manifest.get("dataset_key"):
+            products = [
+                {
+                    "uri": item.get("product_uri"),
+                    "sha256": item.get("sha256"),
+                    "size": item.get("size") or item.get("Size"),
+                }
+                for item in manifest.get("manifest", [])
+            ]
+            return stable_hash({
+                "dataset_key": manifest["dataset_key"],
+                "products": products,
+            })
+        legacy = []
+        for path in _manifest_paths(download_dir):
+            stat = path.stat()
+            legacy.append({
+                "path": str(path),
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+            })
+        return stable_hash(legacy)
+
+    def _processing_key(
+        self, download_dir: Path, request: LightCurveDatasetRequest
+    ) -> tuple[str, str]:
+        fingerprint = self._dataset_fingerprint(download_dir)
+        key = stable_hash({
+            "source": fingerprint,
+            "flux_column": request.flux_column,
+            "quality_filter": request.quality_filter,
+            "version": DERIVED_CACHE_VERSION,
+        })
+        return fingerprint, key
+
+    def _load_derived_cache(
+        self, cache_path: Path, metadata_path: Path
+    ) -> tuple[list[dict[str, float | None]], list[dict[str, Any]]] | None:
+        metadata = read_json(metadata_path)
+        if not cache_path.exists() or not isinstance(metadata, dict):
+            return None
+        try:
+            with np.load(cache_path, allow_pickle=False) as arrays:
+                times = arrays["time"]
+                fluxes = arrays["flux"]
+                errors = arrays["flux_error"]
+            points = [
+                {
+                    "time": float(time),
+                    "flux": float(flux),
+                    "flux_error": None if np.isnan(error) else float(error),
+                }
+                for time, flux, error in zip(times, fluxes, errors)
+            ]
+            return points, metadata.get("files", [])
+        except (OSError, ValueError, KeyError):
+            return None
+
+    def _write_derived_cache(
+        self,
+        cache_path: Path,
+        metadata_path: Path,
+        points: list[dict[str, float | None]],
+        files: list[dict[str, Any]],
+        source_fingerprint: str,
+        processing_key: str,
+    ) -> None:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary_name = tempfile.mkstemp(
+            prefix=f".{cache_path.name}.", suffix=".tmp", dir=cache_path.parent
+        )
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                np.savez_compressed(
+                    handle,
+                    time=np.asarray([point["time"] for point in points]),
+                    flux=np.asarray([point["flux"] for point in points]),
+                    flux_error=np.asarray([
+                        np.nan if point["flux_error"] is None else point["flux_error"]
+                        for point in points
+                    ]),
+                )
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, cache_path)
+        finally:
+            Path(temporary_name).unlink(missing_ok=True)
+        atomic_write_json(metadata_path, {
+            "schema_version": CACHE_SCHEMA_VERSION,
+            "cache_version": DERIVED_CACHE_VERSION,
+            "source_fingerprint": source_fingerprint,
+            "processing_key": processing_key,
+            "created_at": utc_now(),
+            "point_count": len(points),
+            "files": files,
+        })
+
     def _dataset_extra_info(self, download_dir: str) -> dict[str, Any]:
         """Extract extra summary information from a dataset directory."""
         info: dict[str, Any] = {
@@ -164,7 +299,11 @@ class LightCurveFitsService:
         if products_file.exists():
             try:
                 records = json.loads(products_file.read_text(encoding="utf-8"))
-                missions = sorted({rec.get("mission") for rec in records if rec.get("mission")})
+                missions = sorted({
+                    rec.get("mission") or rec.get("obs_collection")
+                    for rec in records
+                    if rec.get("mission") or rec.get("obs_collection")
+                })
                 info["missions"] = missions
             except (json.JSONDecodeError, KeyError):
                 pass
@@ -220,6 +359,7 @@ class LightCurveFitsService:
                 or str(manifest_path.parent.relative_to(PROJECT_ROOT))
             )
             extra = self._dataset_extra_info(download_dir)
+            valid, validation_errors, _ = validate_dataset_dir(manifest_path.parent)
             datasets.append({
                 "target":
                 manifest.get("target"),
@@ -227,6 +367,18 @@ class LightCurveFitsService:
                 download_dir,
                 "generated_at":
                 manifest.get("generated_at"),
+                "last_accessed_at":
+                manifest.get("last_accessed_at"),
+                "dataset_key":
+                manifest.get("dataset_key"),
+                "status":
+                manifest.get("status") or ("complete" if valid else "invalid"),
+                "valid":
+                valid,
+                "validation_errors":
+                validation_errors,
+                "size_bytes":
+                unique_storage_size(iter([manifest_path.parent])),
                 "selected_count":
                 manifest.get("selected_count"),
                 "manifest_entries":
@@ -251,8 +403,27 @@ class LightCurveFitsService:
 
     def _collect_dataset(
         self, request: LightCurveDatasetRequest
-    ) -> tuple[Path, list[dict[str, float | None]], list[dict[str, Any]]]:
+    ) -> tuple[Path, list[dict[str, float | None]], list[dict[str, Any]], dict[str, Any]]:
         download_dir = _resolve_data_path(request.download_dir)
+        source_fingerprint, processing_key = self._processing_key(download_dir, request)
+        cache_dir = DERIVED_CACHE_ROOT / source_fingerprint
+        cache_path = cache_dir / f"{processing_key}.npz"
+        metadata_path = cache_dir / f"{processing_key}.json"
+        with cache_lock(f"derived:{processing_key}"):
+            cached = self._load_derived_cache(cache_path, metadata_path)
+            if cached is not None:
+                points, files = cached
+                self._record_cache_usage(
+                    download_dir,
+                    source_fingerprint=source_fingerprint,
+                    processing_key=processing_key,
+                )
+                return download_dir, points, files, {
+                    "derived_hit": True,
+                    "source_fingerprint": source_fingerprint,
+                    "processing_key": processing_key,
+                }
+
         fits_paths = _manifest_paths(download_dir)
         if not fits_paths:
             raise HTTPException(status_code=404,
@@ -272,11 +443,29 @@ class LightCurveFitsService:
             )
 
         all_points.sort(key=lambda item: float(item["time"] or 0.0))
-        return download_dir, all_points, files
+        with cache_lock(f"derived:{processing_key}"):
+            self._write_derived_cache(
+                cache_path,
+                metadata_path,
+                all_points,
+                files,
+                source_fingerprint,
+                processing_key,
+            )
+        self._record_cache_usage(
+            download_dir,
+            source_fingerprint=source_fingerprint,
+            processing_key=processing_key,
+        )
+        return download_dir, all_points, files, {
+            "derived_hit": False,
+            "source_fingerprint": source_fingerprint,
+            "processing_key": processing_key,
+        }
 
     def load_dataset(self,
                      request: LightCurveDatasetRequest) -> dict[str, Any]:
-        download_dir, all_points, files = self._collect_dataset(request)
+        download_dir, all_points, files, cache_info = self._collect_dataset(request)
         original_count = len(all_points)
         if original_count > request.max_points:
             indices = np.linspace(0,
@@ -291,29 +480,54 @@ class LightCurveFitsService:
             "original_point_count": original_count,
             "files": files,
             "points": all_points,
+            "cache": cache_info,
         }
 
     def write_dataset_csv(self,
                           request: LightCurveDatasetRequest) -> dict[str, Any]:
-        download_dir, points, files = self._collect_dataset(request)
+        download_dir, points, files, cache_info = self._collect_dataset(request)
         csv_path = download_dir / "lightcurve.csv"
 
-        with csv_path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(
-                handle, fieldnames=["time", "flux", "flux_error"])
-            writer.writeheader()
-            writer.writerows(points)
-
         manifest_path = download_dir / "manifest.json"
+        manifest = read_json(manifest_path, {})
+        if (
+            csv_path.exists()
+            and manifest.get("csv_processing_key") == cache_info["processing_key"]
+        ):
+            return {
+                "download_dir": str(download_dir.relative_to(PROJECT_ROOT)),
+                "csv_path": str(csv_path.relative_to(PROJECT_ROOT)),
+                "point_count": manifest.get("csv_point_count", len(points)),
+                "original_point_count": manifest.get("csv_original_point_count", len(points)),
+                "files": files,
+                "cache": {**cache_info, "csv_hit": True},
+            }
+
+        fd, temporary_name = tempfile.mkstemp(
+            prefix=f".{csv_path.name}.", suffix=".tmp", dir=csv_path.parent
+        )
+        temporary_csv = Path(temporary_name)
+        try:
+            with os.fdopen(fd, "w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle, fieldnames=["time", "flux", "flux_error"])
+                writer.writeheader()
+                writer.writerows(points)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_csv, csv_path)
+        finally:
+            temporary_csv.unlink(missing_ok=True)
+
         if manifest_path.exists():
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["csv_path"] = str(csv_path.relative_to(PROJECT_ROOT))
-            manifest["csv_point_count"] = len(points)
-            manifest["csv_original_point_count"] = len(points)
-            manifest_path.write_text(json.dumps(manifest,
-                                                ensure_ascii=False,
-                                                indent=2),
-                                     encoding="utf-8")
+            with cache_lock(f"manifest:{download_dir}"):
+                manifest = read_json(manifest_path, {})
+                manifest["csv_path"] = str(csv_path.relative_to(PROJECT_ROOT))
+                manifest["csv_point_count"] = len(points)
+                manifest["csv_original_point_count"] = len(points)
+                manifest["csv_processing_key"] = cache_info["processing_key"]
+                manifest["csv_generated_at"] = utc_now()
+                atomic_write_json(manifest_path, manifest)
 
         return {
             "download_dir": str(download_dir.relative_to(PROJECT_ROOT)),
@@ -321,11 +535,36 @@ class LightCurveFitsService:
             "point_count": len(points),
             "original_point_count": len(points),
             "files": files,
+            "cache": {**cache_info, "csv_hit": False},
         }
 
     def analyze_dataset(
             self, request: LightCurveDatasetAnalysisRequest) -> dict[str, Any]:
         dataset = self.load_dataset(request)
+        request_payload = request.model_dump() if hasattr(request, "model_dump") else request.dict()
+        analysis_key = stable_hash({
+            "source_fingerprint": dataset["cache"]["source_fingerprint"],
+            "processing_key": dataset["cache"]["processing_key"],
+            "max_points": request.max_points,
+            "detrend": request_payload["detrend"],
+            "period_search": request_payload["period_search"],
+            "version": ANALYSIS_CACHE_VERSION,
+        })
+        analysis_path = ANALYSIS_CACHE_ROOT / f"{analysis_key}.json"
+        cached_analysis = read_json(analysis_path)
+        if isinstance(cached_analysis, dict):
+            self._record_cache_usage(
+                _resolve_data_path(request.download_dir),
+                source_fingerprint=dataset["cache"]["source_fingerprint"],
+                analysis_key=analysis_key,
+            )
+            cached_analysis["cache"] = {
+                **dataset["cache"],
+                "analysis_hit": True,
+                "analysis_key": analysis_key,
+            }
+            return cached_analysis
+
         points = [LightCurvePoint(**point) for point in dataset["points"]]
         analysis = analyze_light_curve(
             LightCurveAnalysisRequest(
@@ -339,4 +578,24 @@ class LightCurveFitsService:
             "original_point_count": dataset["original_point_count"],
             "files": dataset["files"],
         }
+        analysis["cache"] = {
+            **dataset["cache"],
+            "analysis_hit": False,
+            "analysis_key": analysis_key,
+        }
+        with cache_lock(f"analysis:{analysis_key}"):
+            existing = read_json(analysis_path)
+            if isinstance(existing, dict):
+                existing["cache"] = {
+                    **dataset["cache"],
+                    "analysis_hit": True,
+                    "analysis_key": analysis_key,
+                }
+                return existing
+            atomic_write_json(analysis_path, analysis)
+        self._record_cache_usage(
+            _resolve_data_path(request.download_dir),
+            source_fingerprint=dataset["cache"]["source_fingerprint"],
+            analysis_key=analysis_key,
+        )
         return analysis
