@@ -3,11 +3,12 @@ from __future__ import annotations
 import os
 import socket
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .schemas import LightCurveAnalysisRequest, LightCurveArchiveDownloadRequest, LightCurveArchiveSearchRequest, LightCurveCacheCleanupRequest, LightCurveCacheVerifyRequest, LightCurveDatasetAnalysisRequest, LightCurveDatasetDeleteRequest, LightCurveDatasetRequest, LiteratureResearchRequest, TargetQueryRequest
+from .schemas import CatalogBatchDeleteRequest, CatalogBatchExportRequest, CatalogListRequest, LightCurveAnalysisRequest, LightCurveArchiveDownloadRequest, LightCurveArchiveSearchRequest, LightCurveCacheCleanupRequest, LightCurveCacheVerifyRequest, LightCurveDatasetAnalysisRequest, LightCurveDatasetDeleteRequest, LightCurveDatasetRequest, LiteratureResearchRequest, TargetQueryRequest
+from .services.catalog_service import CatalogService
 from .services.lightcurve_cache_service import LightCurveCacheService
 from .services.lightcurve_archive_service import LightCurveArchiveService
 from .services.lightcurve_fits_service import LightCurveFitsService
@@ -84,6 +85,15 @@ target_service = TargetSearchService()
 lightcurve_archive_service = LightCurveArchiveService()
 lightcurve_fits_service = LightCurveFitsService()
 lightcurve_cache_service = LightCurveCacheService()
+catalog_service = CatalogService()
+
+
+def _sync_catalog() -> None:
+    """Rebuild unified catalog after data changes (best-effort)."""
+    try:
+        catalog_service.rebuild()
+    except Exception:
+        pass
 
 
 @app.get("/api/health")
@@ -119,6 +129,7 @@ def download_lightcurves(request: LightCurveArchiveDownloadRequest) -> dict:
                                  quality_filter=True,
                                  max_points=100000))
     result["csv"] = csv_result
+    _sync_catalog()
     return result
 
 
@@ -129,7 +140,9 @@ def list_lightcurve_datasets(target: str | None = None) -> dict:
 
 @app.post("/api/lightcurves/datasets/delete")
 def delete_lightcurve_dataset(request: LightCurveDatasetDeleteRequest) -> dict:
-    return lightcurve_cache_service.delete_dataset(request.download_dir)
+    result = lightcurve_cache_service.delete_dataset(request.download_dir)
+    _sync_catalog()
+    return result
 
 
 @app.get("/api/lightcurves/cache/stats")
@@ -161,6 +174,65 @@ def load_lightcurve_dataset(request: LightCurveDatasetRequest) -> dict:
 def analyze_lightcurve_dataset(
         request: LightCurveDatasetAnalysisRequest) -> dict:
     return lightcurve_fits_service.analyze_dataset(request)
+
+
+# ── Catalog / Data Manager ────────────────────────────────────────
+
+@app.get("/api/catalog/stats")
+def catalog_stats() -> dict:
+    return catalog_service.stats()
+
+
+@app.post("/api/catalog/entries")
+def catalog_list_entries(request: CatalogListRequest) -> dict:
+    return catalog_service.list_entries(
+        entry_type=request.entry_type,
+        source=request.source,
+        search=request.search,
+        tags=request.tags,
+        offset=request.offset,
+        limit=request.limit,
+    )
+
+
+@app.get("/api/catalog/entries/{entry_id}")
+def catalog_get_entry(entry_id: str) -> dict:
+    return catalog_service.get_entry(entry_id)
+
+
+@app.delete("/api/catalog/entries/{entry_id}")
+def catalog_delete_entry(entry_id: str) -> dict:
+    return catalog_service.delete_entry(entry_id)
+
+
+@app.post("/api/catalog/entries/batch-delete")
+def catalog_batch_delete(request: CatalogBatchDeleteRequest) -> dict:
+    return catalog_service.batch_delete(request.entry_ids)
+
+
+@app.get("/api/catalog/stars")
+def catalog_list_stars(
+    search: str | None = Query(default=None, description="Search star name or source"),
+    source: str | None = Query(default=None, description="Filter by data source"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=500),
+) -> dict:
+    return catalog_service.list_stars(
+        search=search,
+        source=source,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@app.delete("/api/catalog/stars/{star_name:path}")
+def catalog_delete_star(star_name: str) -> dict:
+    return catalog_service.delete_star(star_name)
+
+
+@app.post("/api/catalog/rebuild")
+def catalog_rebuild() -> dict:
+    return catalog_service.rebuild()
 
 
 # ---- 静态文件服务：Docker 部署时提供前端 SPA ----

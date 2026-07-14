@@ -1,0 +1,233 @@
+import { useCallback, useEffect, useState } from "react";
+import { Database, HardDrive, RefreshCw, Trash2, Star } from "lucide-react";
+import { useDataManagerState } from "../../hooks/useDataManagerState";
+import {
+  getCatalogStats,
+  listStars,
+  deleteStar,
+  rebuildCatalog,
+} from "../../api";
+import ErrorBanner from "../shared/ErrorBanner";
+import EmptyState from "../shared/EmptyState";
+import DataFilter from "./DataFilter";
+import StarCard from "./StarCard";
+
+export default function DataManagerPage() {
+  const dm = useDataManagerState();
+  const [deletingStar, setDeletingStar] = useState(null);
+
+  // ── Load ──
+  const loadStats = useCallback(async () => {
+    try {
+      const stats = await getCatalogStats();
+      dm.dispatch({ type: "SET_STATS", payload: stats });
+    } catch (e) {
+      dm.dispatch({ type: "SET_ERROR", payload: e.message });
+    }
+  }, [dm.dispatch]);
+
+  const loadStars = useCallback(async () => {
+    dm.dispatch({ type: "SET_BUSY" });
+    try {
+      const result = await listStars({
+        search: dm.search || null,
+        source: dm.source || null,
+        offset: dm.offset,
+        limit: dm.limit,
+      });
+      dm.dispatch({ type: "SET_STARS", payload: result });
+      await loadStats();
+    } catch (e) {
+      dm.dispatch({ type: "SET_ERROR", payload: e.message });
+    }
+  }, [dm.search, dm.source, dm.offset, dm.limit, dm.dispatch, loadStats]);
+
+  useEffect(() => {
+    loadStars();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dm.source, dm.offset, dm.limit]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => loadStars(), 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dm.search]);
+
+  // ── Actions ──
+  const handleBatchDelete = useCallback(async () => {
+    if (!dm.selectedStars.length) return;
+    if (!window.confirm(`确认删除 ${dm.selectedStars.length} 个星的全部数据？此操作不可撤销。`)) return;
+    dm.dispatch({ type: "SET_BUSY" });
+    try {
+      let totalRemovedMb = 0;
+      for (const starName of dm.selectedStars) {
+        setDeletingStar(starName);
+        const result = await deleteStar(starName);
+        totalRemovedMb += result.removed_mb || 0;
+      }
+      dm.dispatch({
+        type: "SET_MESSAGE",
+        payload: `已删除，释放 ${totalRemovedMb.toFixed(2)} MB。`,
+      });
+      await loadStars();
+      await loadStats();
+    } catch (e) {
+      dm.dispatch({ type: "SET_ERROR", payload: e.message });
+    } finally {
+      setDeletingStar(null);
+    }
+  }, [dm.selectedStars, dm.dispatch, loadStars, loadStats]);
+
+  const handleDeleteSingle = useCallback(async (starName) => {
+    dm.dispatch({ type: "SET_BUSY" });
+    setDeletingStar(starName);
+    try {
+      const result = await deleteStar(starName);
+      dm.dispatch({
+        type: "SET_MESSAGE",
+        payload: `已删除「${starName}」，释放 ${result.removed_mb} MB。`,
+      });
+      await loadStars();
+      await loadStats();
+    } catch (e) {
+      dm.dispatch({ type: "SET_ERROR", payload: e.message });
+    } finally {
+      setDeletingStar(null);
+    }
+  }, [dm.dispatch, loadStars, loadStats]);
+
+  const handleRebuild = useCallback(async () => {
+    dm.dispatch({ type: "SET_BUSY" });
+    try {
+      const result = await rebuildCatalog();
+      dm.dispatch({
+        type: "SET_MESSAGE",
+        payload: `目录已重建：${result.total_entries} 个条目。`,
+      });
+      await loadStars();
+      await loadStats();
+    } catch (e) {
+      dm.dispatch({ type: "SET_ERROR", payload: e.message });
+    }
+  }, [dm.dispatch, loadStars, loadStats]);
+
+  // ── Pagination ──
+  const totalPages = Math.max(1, Math.ceil(dm.total / dm.limit));
+  const currentPage = Math.floor(dm.offset / dm.limit) + 1;
+
+  return (
+    <section className="dm-workspace">
+      <ErrorBanner message={dm.error} />
+
+      {/* ── Stats bar ── */}
+      {dm.stats ? (
+        <div className="dm-stats-bar">
+          <div className="dm-stat-card">
+            <Database size={16} />
+            <span>{dm.stats.total_entries} 条目</span>
+          </div>
+          <div className="dm-stat-card">
+            <Star size={16} />
+            <span>{dm.total} 颗星</span>
+          </div>
+          <div className="dm-stat-card">
+            <HardDrive size={16} />
+            <span>{dm.stats.total_size_mb} MB</span>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Toolbar ── */}
+      <div className="dm-toolbar">
+        <DataFilter
+          source={dm.source}
+          search={dm.search}
+          onFilterChange={dm.setFilter}
+          busy={dm.busy}
+        />
+        <div className="dm-toolbar-actions">
+          {dm.selectedStars.length > 0 ? (
+            <button
+              type="button"
+              className="danger-button"
+              onClick={handleBatchDelete}
+              disabled={dm.busy}
+            >
+              <Trash2 size={16} />
+              删除选中 ({dm.selectedStars.length})
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={handleRebuild}
+            disabled={dm.busy}
+          >
+            <RefreshCw size={16} />
+            重建索引
+          </button>
+        </div>
+      </div>
+
+      {dm.message ? <div className="dm-message">{dm.message}</div> : null}
+
+      {/* ── Star list ── */}
+      <div className="dm-star-list">
+        {dm.stars.length > 0 ? (
+          dm.stars.map((star) => (
+            <StarCard
+              key={star.normalized}
+              star={star}
+              expanded={dm.expandedStar === star.normalized}
+              selected={dm.selectedStars.includes(star.normalized)}
+              onToggleExpand={dm.toggleExpand}
+              onToggleSelect={dm.toggleSelect}
+              onDelete={handleDeleteSingle}
+              busy={dm.busy && deletingStar === star.normalized}
+            />
+          ))
+        ) : dm.busy ? null : (
+          <EmptyState
+            icon={<Database size={48} />}
+            title="无匹配结果"
+            description="尝试调整筛选条件或重建索引。"
+          />
+        )}
+      </div>
+
+      {/* ── Pagination ── */}
+      {dm.total > dm.limit ? (
+        <div className="dm-pagination">
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={dm.offset === 0 || dm.busy}
+            onClick={() => dm.setOffset(Math.max(0, dm.offset - dm.limit))}
+          >
+            上一页
+          </button>
+          <span>{currentPage} / {totalPages}</span>
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={dm.offset + dm.limit >= dm.total || dm.busy}
+            onClick={() => dm.setOffset(dm.offset + dm.limit)}
+          >
+            下一页
+          </button>
+          <select
+            value={dm.limit}
+            onChange={(e) => dm.setLimit(Number(e.target.value))}
+            disabled={dm.busy}
+            style={{ width: "auto", marginLeft: 12 }}
+          >
+            <option value={25}>25/页</option>
+            <option value={50}>50/页</option>
+            <option value={100}>100/页</option>
+          </select>
+        </div>
+      ) : null}
+    </section>
+  );
+}

@@ -10,8 +10,6 @@ export default function ArchivePanel({
   cacheStats,
   cacheBusy,
   cacheMessage,
-  cleanupAgeDays,
-  cleanupMaxSizeMb,
   selectedDataset,
   hasTarget,
   onSearch,
@@ -19,8 +17,6 @@ export default function ArchivePanel({
   onToggleProduct,
   onForceDownloadChange,
   onForceSearchRefreshChange,
-  onCleanupAgeChange,
-  onCleanupSizeChange,
   onCacheVerify,
   onCacheCleanup,
 }) {
@@ -105,16 +101,6 @@ export default function ArchivePanel({
           <strong>缓存</strong>
           <span>{cacheStats ? `${cacheStats.megabytes_used} MB · ${cacheStats.datasets} 数据集` : "读取中"}</span>
           {cacheStats?.invalid_datasets ? <em>{cacheStats.invalid_datasets} 个异常</em> : null}
-        </div>
-        <div className="cache-limits">
-          <label>
-            保留天数
-            <input type="number" min="1" value={cleanupAgeDays} onChange={(event) => onCleanupAgeChange(event.target.value)} />
-          </label>
-          <label>
-            上限 MB
-            <input type="number" min="1" value={cleanupMaxSizeMb} onChange={(event) => onCleanupSizeChange(event.target.value)} />
-          </label>
         </div>
         <div className="cache-actions">
           <button type="button" onClick={onCacheVerify} disabled={cacheBusy}>校验</button>

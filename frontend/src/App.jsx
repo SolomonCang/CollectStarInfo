@@ -13,6 +13,7 @@ import {
 } from "./api";
 import TargetPage from "./components/target/TargetPage";
 import LightCurvePage from "./components/lightcurve/LightCurvePage";
+import DataManagerPage from "./components/datamanager/DataManagerPage";
 import "./styles.css";
 
 function targetDisplayName(result, fallback) {
@@ -228,14 +229,12 @@ export default function App() {
   }, [lc.dispatch]);
 
   const handleCacheCleanup = useCallback(async (dryRun = true) => {
-    if (!dryRun && !window.confirm("确认执行缓存清理？命中的历史数据集将被删除。")) return;
-    const age = Number(lc.cleanupAgeDays);
-    const size = Number(lc.cleanupMaxSizeMb);
+    if (!dryRun && !window.confirm("确认执行缓存清理？未引用的产品和过期临时文件将被删除。")) return;
     lc.dispatch({ type: "SET_CACHE_BUSY" });
     try {
       const result = await cleanupLightCurveCache({
-        max_age_days: Number.isFinite(age) && age > 0 ? age : null,
-        max_size_mb: Number.isFinite(size) && size > 0 ? size : null,
+        max_age_days: null,
+        max_size_mb: null,
         dry_run: dryRun,
         remove_unreferenced_products: true,
       });
@@ -245,8 +244,8 @@ export default function App() {
         payload: {
           stats,
           message: dryRun
-            ? `清理预览：${result.datasets.length} 个数据集、${result.unreferenced_products} 个未引用产品。`
-            : `清理完成：删除 ${result.datasets.length} 个数据集，释放 ${(result.removed_bytes / 1024 / 1024).toFixed(2)} MB。`,
+            ? `清理预览：${result.unreferenced_products} 个未引用产品、${result.stale_partial_directories} 个过期临时目录。`
+            : `清理完成：释放 ${(result.removed_bytes / 1024 / 1024).toFixed(2)} MB。`,
         },
       });
       if (!dryRun && lc.targetResult) {
@@ -262,7 +261,7 @@ export default function App() {
     } catch (caught) {
       lc.dispatch({ type: "SET_ARCHIVE_ERROR", payload: caught.message });
     }
-  }, [lc.cleanupAgeDays, lc.cleanupMaxSizeMb, lc.targetResult, lc.targetDisplayName, lc.dispatch, lc.handleAnalyzeDownloadedDataset]);
+  }, [lc.targetResult, lc.targetDisplayName, lc.dispatch, lc.handleAnalyzeDownloadedDataset]);
 
   const handleDeleteDataset = useCallback(async (downloadDir) => {
     if (!downloadDir || !window.confirm(`确认删除数据集 ${downloadDir}？`)) return;
@@ -312,10 +311,17 @@ export default function App() {
           >
             光变曲线
           </button>
+          <button
+            type="button"
+            className={page === "data" ? "nav-button active" : "nav-button"}
+            onClick={() => setPage("data")}
+          >
+            数据管理
+          </button>
         </div>
       </section>
 
-      {page === "target" ? (
+      {page === "target" && (
         <TargetPage
           error={targetError}
           forceRefresh={forceRefresh}
@@ -336,7 +342,8 @@ export default function App() {
           targetResult={targetResult}
           useLlm={useLlm}
         />
-      ) : (
+      )}
+      {page === "lightcurves" && (
         <LightCurvePage
           // State
           targetName={lc.targetName}
@@ -351,8 +358,6 @@ export default function App() {
           cacheStats={lc.cacheStats}
           cacheBusy={lc.cacheBusy}
           cacheMessage={lc.cacheMessage}
-          cleanupAgeDays={lc.cleanupAgeDays}
-          cleanupMaxSizeMb={lc.cleanupMaxSizeMb}
           datasets={lc.datasets}
           selectedDatasetDir={lc.selectedDatasetDir}
           datasetBusy={lc.datasetBusy}
@@ -388,8 +393,6 @@ export default function App() {
           setSelectedDatasetDir={lc.setSelectedDatasetDir}
           setForceDownload={lc.setForceDownload}
           setForceSearchRefresh={lc.setForceSearchRefresh}
-          setCleanupAgeDays={lc.setCleanupAgeDays}
-          setCleanupMaxSizeMb={lc.setCleanupMaxSizeMb}
           toggleProduct={lc.toggleProduct}
           handleSpectrumClick={lc.handleSpectrumClick}
           handleAnalyze={lc.handleAnalyze}
@@ -403,6 +406,9 @@ export default function App() {
           handleCacheCleanup={handleCacheCleanup}
           handleDeleteDataset={handleDeleteDataset}
         />
+      )}
+      {page === "data" && (
+        <DataManagerPage />
       )}
     </main>
   );

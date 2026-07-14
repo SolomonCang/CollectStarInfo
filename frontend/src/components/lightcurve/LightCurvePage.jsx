@@ -26,8 +26,6 @@ export default function LightCurvePage({
   cacheStats,
   cacheBusy,
   cacheMessage,
-  cleanupAgeDays,
-  cleanupMaxSizeMb,
   datasets,
   selectedDatasetDir,
   datasetBusy,
@@ -63,8 +61,6 @@ export default function LightCurvePage({
   setSelectedDatasetDir,
   setForceDownload,
   setForceSearchRefresh,
-  setCleanupAgeDays,
-  setCleanupMaxSizeMb,
   toggleProduct,
   handleSpectrumClick,
   handleAnalyze,
@@ -102,8 +98,6 @@ export default function LightCurvePage({
           cacheStats={cacheStats}
           cacheBusy={cacheBusy}
           cacheMessage={cacheMessage}
-          cleanupAgeDays={cleanupAgeDays}
-          cleanupMaxSizeMb={cleanupMaxSizeMb}
           selectedDataset={selectedDataset}
           hasTarget={!!targetResult && hasTargetCoordinates}
           onSearch={handleArchiveSearch}
@@ -111,8 +105,6 @@ export default function LightCurvePage({
           onToggleProduct={toggleProduct}
           onForceDownloadChange={setForceDownload}
           onForceSearchRefreshChange={setForceSearchRefresh}
-          onCleanupAgeChange={setCleanupAgeDays}
-          onCleanupSizeChange={setCleanupMaxSizeMb}
           onCacheVerify={handleCacheVerify}
           onCacheCleanup={handleCacheCleanup}
         />

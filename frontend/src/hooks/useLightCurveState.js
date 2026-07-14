@@ -26,9 +26,6 @@ const initialState = {
   cacheStats: null,
   cacheBusy: false,
   cacheMessage: "",
-  cleanupAgeDays: "90",
-  cleanupMaxSizeMb: "2048",
-
   // Datasets
   datasets: [],
   selectedDatasetDir: "",
@@ -150,11 +147,6 @@ function reducer(state, action) {
         cacheStats: action.payload.stats ?? state.cacheStats,
         cacheMessage: action.payload.message ?? "",
       };
-    case "SET_CLEANUP_AGE":
-      return { ...state, cleanupAgeDays: action.payload };
-    case "SET_CLEANUP_SIZE":
-      return { ...state, cleanupMaxSizeMb: action.payload };
-
     case "SET_MIN_PERIOD":
       return { ...state, minPeriod: action.payload };
     case "SET_MAX_PERIOD":
@@ -281,8 +273,6 @@ export function useLightCurveState() {
   const setSelectedDatasetDir = useCallback((val) => dispatch({ type: "SET_SELECTED_DATASET", payload: val }), []);
   const setForceDownload = useCallback((val) => dispatch({ type: "SET_FORCE_DOWNLOAD", payload: val }), []);
   const setForceSearchRefresh = useCallback((val) => dispatch({ type: "SET_FORCE_SEARCH_REFRESH", payload: val }), []);
-  const setCleanupAgeDays = useCallback((val) => dispatch({ type: "SET_CLEANUP_AGE", payload: val }), []);
-  const setCleanupMaxSizeMb = useCallback((val) => dispatch({ type: "SET_CLEANUP_SIZE", payload: val }), []);
   const setError = useCallback((val) => dispatch({ type: "SET_ERROR", payload: val }), []);
   const setPeriodogramDomain = useCallback((val) => dispatch({ type: "SET_PERIODOGRAM_DOMAIN", payload: val }), []);
   const resetZoom = useCallback(() => dispatch({ type: "RESET_ZOOM" }), []);
@@ -397,8 +387,6 @@ export function useLightCurveState() {
     setSelectedDatasetDir,
     setForceDownload,
     setForceSearchRefresh,
-    setCleanupAgeDays,
-    setCleanupMaxSizeMb,
     setError,
     setPoints,
     setProgressSteps,

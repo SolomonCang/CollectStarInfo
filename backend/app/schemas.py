@@ -96,3 +96,22 @@ class LightCurveAnalysisRequest(BaseModel):
     detrend: DetrendOptions = Field(default_factory=DetrendOptions)
     period_search: PeriodSearchOptions = Field(
         default_factory=PeriodSearchOptions)
+
+
+# ── Catalog / Data Manager ────────────────────────────────────────
+
+class CatalogListRequest(BaseModel):
+    entry_type: str | None = Field(default=None, description="Filter: target_result | lightcurve_dataset")
+    source: str | None = Field(default=None, description="Filter by source substring")
+    search: str | None = Field(default=None, description="Search in display_name, source, tags")
+    tags: list[str] = Field(default_factory=list)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=50, ge=1, le=500)
+
+
+class CatalogBatchDeleteRequest(BaseModel):
+    entry_ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class CatalogBatchExportRequest(BaseModel):
+    entry_ids: list[str] = Field(min_length=1, max_length=200)

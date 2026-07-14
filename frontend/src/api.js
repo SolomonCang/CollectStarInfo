@@ -85,3 +85,55 @@ export function analyzeDownloadedLightCurve(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+// ── Catalog / Data Manager ─────────────────────────────────────
+
+export function getCatalogStats() {
+  return request("/api/catalog/stats");
+}
+
+export function listCatalogEntries(payload = {}) {
+  return request("/api/catalog/entries", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getCatalogEntry(entryId) {
+  return request(`/api/catalog/entries/${encodeURIComponent(entryId)}`);
+}
+
+export function deleteCatalogEntry(entryId) {
+  return request(`/api/catalog/entries/${encodeURIComponent(entryId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function batchDeleteCatalogEntries(entryIds) {
+  return request("/api/catalog/entries/batch-delete", {
+    method: "POST",
+    body: JSON.stringify({ entry_ids: entryIds }),
+  });
+}
+
+export function rebuildCatalog() {
+  return request("/api/catalog/rebuild", {
+    method: "POST",
+  });
+}
+
+export function listStars(params = {}) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set("search", params.search);
+  if (params.source) qs.set("source", params.source);
+  if (params.offset != null) qs.set("offset", String(params.offset));
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  const q = qs.toString();
+  return request(`/api/catalog/stars${q ? `?${q}` : ""}`);
+}
+
+export function deleteStar(starName) {
+  return request(`/api/catalog/stars/${encodeURIComponent(starName)}`, {
+    method: "DELETE",
+  });
+}

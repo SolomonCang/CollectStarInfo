@@ -88,7 +88,17 @@ class TargetSearchService:
         path = RESULTS_DIR / f"{safe_target_filename(target)}.json"
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
                         encoding="utf-8")
+        # Trigger a catalog rebuild so the new entry is visible immediately
+        self._sync_catalog()
         return str(path.relative_to(PROJECT_ROOT))
+
+    def _sync_catalog(self) -> None:
+        """Rebuild the unified catalog after writing new data."""
+        try:
+            from .catalog_service import _rebuild_catalog
+            _rebuild_catalog()
+        except Exception:
+            pass  # catalog sync is best-effort; never fail the main request
 
     async def query_target(self, request: TargetQueryRequest) -> dict:
         target = request.target.strip()

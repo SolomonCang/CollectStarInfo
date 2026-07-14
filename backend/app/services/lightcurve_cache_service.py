@@ -266,10 +266,10 @@ class LightCurveCacheService:
     def cleanup(
         self,
         *,
-        max_age_days: float | None,
-        max_size_mb: float | None,
-        dry_run: bool,
-        remove_unreferenced_products: bool,
+        max_age_days: float | None = None,
+        max_size_mb: float | None = None,
+        dry_run: bool = True,
+        remove_unreferenced_products: bool = True,
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc).timestamp()
         datasets: list[tuple[Path, float, int]] = []
@@ -353,8 +353,8 @@ class LightCurveCacheService:
                     path for path in ANALYSIS_CACHE_ROOT.glob("*.json")
                     if path.stem not in active_analysis_keys
                 ]
-            search_ttl = int(os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "21600"))
-            if SEARCH_CACHE_ROOT.exists():
+            search_ttl = int(os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "0"))
+            if search_ttl > 0 and SEARCH_CACHE_ROOT.exists():
                 expired_search = [
                     path for path in SEARCH_CACHE_ROOT.glob("*.json")
                     if now - path.stat().st_mtime > search_ttl

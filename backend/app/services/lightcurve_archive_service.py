@@ -31,7 +31,7 @@ from .lightcurve_cache_service import (
 
 LIGHT_CURVE_SUBGROUPS = {"LC", "LLC", "SLC"}
 DEFAULT_MISSIONS = {"TESS", "KEPLER", "K2"}
-SEARCH_CACHE_TTL_SECONDS = int(os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "21600"))
+SEARCH_CACHE_TTL_SECONDS = int(os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "0"))
 
 
 def safe_target_name(name: str) -> str:
@@ -188,7 +188,10 @@ class LightCurveArchiveService:
             not request.force_refresh
             and isinstance(cached, dict)
             and isinstance(cached.get("response"), dict)
-            and time.time() - cache_path.stat().st_mtime <= SEARCH_CACHE_TTL_SECONDS
+            and (
+                SEARCH_CACHE_TTL_SECONDS <= 0
+                or time.time() - cache_path.stat().st_mtime <= SEARCH_CACHE_TTL_SECONDS
+            )
         ):
             response = dict(cached["response"])
             response["cache"] = {

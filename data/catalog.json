@@ -1,0 +1,1020 @@
+{
+  "version": 1,
+  "updated_at": "2026-07-14T02:31:59.831545+00:00",
+  "entries": [
+    {
+      "id": "res_AD Leo",
+      "type": "target_result",
+      "display_name": "AD Leo",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/AD Leo.json",
+      "size_bytes": 1919024,
+      "created_at": "2026-04-22T12:36:14.432975Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 154.90117007551083,
+        "dec_deg": 19.87000290182528,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_AU Mic c",
+      "type": "target_result",
+      "display_name": "AU Mic c",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/AU Mic c.json",
+      "size_bytes": 2244375,
+      "created_at": "2026-04-10T02:30:06.588844Z",
+      "tags": [
+        "planet"
+      ],
+      "metadata": {
+        "target_type": "planet",
+        "ra_deg": 311.28971873921626,
+        "dec_deg": -31.34089941384472,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_AU Mic",
+      "type": "target_result",
+      "display_name": "AU Mic",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/AU Mic.json",
+      "size_bytes": 2247705,
+      "created_at": "2026-04-22T12:36:55.156311Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 311.28971873921626,
+        "dec_deg": -31.34089941384472,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_AX Mic",
+      "type": "target_result",
+      "display_name": "AX Mic",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/AX Mic.json",
+      "size_bytes": 312408,
+      "created_at": "2026-03-27T11:21:08.855172Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 319.3136211170721,
+        "dec_deg": -38.86736220516139,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_BD 13 2618",
+      "type": "target_result",
+      "display_name": "BD 13 2618",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/BD 13 2618.json",
+      "size_bytes": 455,
+      "created_at": "2026-04-22T12:36:58.291130Z",
+      "tags": [
+        "unknown"
+      ],
+      "metadata": {
+        "target_type": "unknown",
+        "ra_deg": null,
+        "dec_deg": null,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_BD 61 195",
+      "type": "target_result",
+      "display_name": "BD 61 195",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/BD 61 195.json",
+      "size_bytes": 454,
+      "created_at": "2026-04-22T12:36:59.604560Z",
+      "tags": [
+        "unknown"
+      ],
+      "metadata": {
+        "target_type": "unknown",
+        "ra_deg": null,
+        "dec_deg": null,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_BD-16 351",
+      "type": "target_result",
+      "display_name": "BD-16 351",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/BD-16 351.json",
+      "size_bytes": 89251,
+      "created_at": "2026-04-05T15:16:06.034592Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 30.39819126997,
+        "dec_deg": -16.166921607129996,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_BD-20 951",
+      "type": "target_result",
+      "display_name": "BD-20 951",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/BD-20 951.json",
+      "size_bytes": 69493,
+      "created_at": "2026-04-05T15:16:26.338418Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 73.20633578512,
+        "dec_deg": -19.917133182970005,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_BX Ant",
+      "type": "target_result",
+      "display_name": "BX Ant",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/BX Ant.json",
+      "size_bytes": 271304,
+      "created_at": "2026-04-22T12:37:13.225111Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 154.61957813388,
+        "dec_deg": -31.834119459039993,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_CE Ant",
+      "type": "target_result",
+      "display_name": "CE Ant",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/CE Ant.json",
+      "size_bytes": 515685,
+      "created_at": "2026-04-22T12:37:25.040902Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 160.62542455365,
+        "dec_deg": -33.67117494589,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_CN Leo",
+      "type": "target_result",
+      "display_name": "CN Leo",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/CN Leo.json",
+      "size_bytes": 1100839,
+      "created_at": "2026-04-22T12:37:45.879613Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 164.1205036259475,
+        "dec_deg": 7.014723134801666,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_DG CVn",
+      "type": "target_result",
+      "display_name": "DG CVn",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/DG CVn.json",
+      "size_bytes": 257134,
+      "created_at": "2026-04-22T12:37:58.860313Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 202.944269239622,
+        "dec_deg": 29.276855846916,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_DN Tau",
+      "type": "target_result",
+      "display_name": "DN Tau",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/DN Tau.json",
+      "size_bytes": 711969,
+      "created_at": "2026-04-22T12:38:19.743857Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 68.86407342756,
+        "dec_deg": 24.2496973177,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_DS Leo",
+      "type": "target_result",
+      "display_name": "DS Leo",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/DS Leo.json",
+      "size_bytes": 486509,
+      "created_at": "2026-04-22T12:38:31.562750Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 165.65975842087,
+        "dec_deg": 21.9671388926,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_DT Vir",
+      "type": "target_result",
+      "display_name": "DT Vir",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/DT Vir.json",
+      "size_bytes": 527474,
+      "created_at": "2026-04-22T12:38:43.121424Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 195.19398619308538,
+        "dec_deg": 12.375743674973055,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_DX Cnc",
+      "type": "target_result",
+      "display_name": "DX Cnc",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/DX Cnc.json",
+      "size_bytes": 487316,
+      "created_at": "2026-04-22T12:39:18.337615Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 127.45563663413579,
+        "dec_deg": 26.77600670640528,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_EQ Peg",
+      "type": "target_result",
+      "display_name": "EQ Peg",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/EQ Peg.json",
+      "size_bytes": 455038,
+      "created_at": "2026-04-22T12:39:31.510580Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 352.96741241175175,
+        "dec_deg": 19.937264025562538,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_EV Lac",
+      "type": "target_result",
+      "display_name": "EV Lac",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/EV Lac.json",
+      "size_bytes": 1203077,
+      "created_at": "2026-04-22T12:39:48.278355Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 341.70721358761165,
+        "dec_deg": 44.33399288376722,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_FK Aqr",
+      "type": "target_result",
+      "display_name": "FK Aqr",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/FK Aqr.json",
+      "size_bytes": 325703,
+      "created_at": "2026-04-22T12:40:02.768872Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 339.6898942660854,
+        "dec_deg": -20.621135401965557,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_GJ 1243",
+      "type": "target_result",
+      "display_name": "GJ 1243",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/GJ 1243.json",
+      "size_bytes": 469899,
+      "created_at": "2026-04-22T12:40:30.139045Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 297.7888358221621,
+        "dec_deg": 46.48339272493889,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_GJ 273",
+      "type": "target_result",
+      "display_name": "GJ 273",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/GJ 273.json",
+      "size_bytes": 722058,
+      "created_at": "2026-04-22T12:40:38.304037Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 111.85207903566794,
+        "dec_deg": 5.225789303071388,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_GJ 65A",
+      "type": "target_result",
+      "display_name": "GJ 65A",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/GJ 65A.json",
+      "size_bytes": 254826,
+      "created_at": "2026-04-22T12:40:47.502394Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 24.75573856713083,
+        "dec_deg": -17.950718742164163,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_GJ 65B",
+      "type": "target_result",
+      "display_name": "GJ 65B",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/GJ 65B.json",
+      "size_bytes": 722651,
+      "created_at": "2026-04-22T12:41:23.365570Z",
+      "tags": [
+        "planet"
+      ],
+      "metadata": {
+        "target_type": "planet",
+        "ra_deg": 24.756823827312502,
+        "dec_deg": -17.950278122424443,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_HD 295290",
+      "type": "target_result",
+      "display_name": "HD 295290",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/HD 295290.json",
+      "size_bytes": 61653,
+      "created_at": "2026-04-03T11:30:53.763628Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 100.09316395967,
+        "dec_deg": -3.5330827874099997,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_HD 325367",
+      "type": "target_result",
+      "display_name": "HD 325367",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/HD 325367.json",
+      "size_bytes": 799222,
+      "created_at": "2026-04-22T12:41:35.761792Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 240.77288128576998,
+        "dec_deg": -40.30706297991,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_HK Aqr",
+      "type": "target_result",
+      "display_name": "HK Aqr",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/HK Aqr.json",
+      "size_bytes": 298996,
+      "created_at": "2026-04-22T12:41:44.837275Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 347.08146257227,
+        "dec_deg": -15.409935022140003,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 10526294",
+      "type": "target_result",
+      "display_name": "KIC 10526294",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 10526294.json",
+      "size_bytes": 153527,
+      "created_at": "2026-03-27T14:56:45.419308Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 288.01141489938,
+        "dec_deg": 47.710112831370004,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 11671923",
+      "type": "target_result",
+      "display_name": "KIC 11671923",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 11671923.json",
+      "size_bytes": 25181,
+      "created_at": "2026-03-27T14:57:38.462918Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 296.65140553319,
+        "dec_deg": 49.71557133956,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 11912716",
+      "type": "target_result",
+      "display_name": "KIC 11912716",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 11912716.json",
+      "size_bytes": 71758,
+      "created_at": "2026-03-27T14:59:05.291683Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 290.84911148475,
+        "dec_deg": 50.27128776931,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 4931738",
+      "type": "target_result",
+      "display_name": "KIC 4931738",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 4931738.json",
+      "size_bytes": 41202,
+      "created_at": "2026-03-27T15:00:05.002044Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 294.00370443613,
+        "dec_deg": 40.09862576703,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 5450881",
+      "type": "target_result",
+      "display_name": "KIC 5450881",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 5450881.json",
+      "size_bytes": 23372,
+      "created_at": "2026-03-27T15:00:55.888021Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 292.57454953036,
+        "dec_deg": 40.63430924182,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 6462033",
+      "type": "target_result",
+      "display_name": "KIC 6462033",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 6462033.json",
+      "size_bytes": 66790,
+      "created_at": "2026-03-27T15:01:54.456899Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 297.1404980797,
+        "dec_deg": 41.83034264499,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 8057661",
+      "type": "target_result",
+      "display_name": "KIC 8057661",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 8057661.json",
+      "size_bytes": 61923,
+      "created_at": "2026-03-27T15:03:34.647447Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 300.07495636169,
+        "dec_deg": 43.83217105406,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 8177087",
+      "type": "target_result",
+      "display_name": "KIC 8177087",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 8177087.json",
+      "size_bytes": 53696,
+      "created_at": "2026-03-27T15:04:28.265892Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 295.6072231826,
+        "dec_deg": 44.02175529886,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 8255796",
+      "type": "target_result",
+      "display_name": "KIC 8255796",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 8255796.json",
+      "size_bytes": 29298,
+      "created_at": "2026-03-27T15:05:21.993845Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 298.61167069334994,
+        "dec_deg": 44.19408224976,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 8714886",
+      "type": "target_result",
+      "display_name": "KIC 8714886",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 8714886.json",
+      "size_bytes": 80291,
+      "created_at": "2026-03-27T15:06:44.578628Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 299.79243605523,
+        "dec_deg": 44.862448956760005,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_KIC 9227988",
+      "type": "target_result",
+      "display_name": "KIC 9227988",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/KIC 9227988.json",
+      "size_bytes": 27073,
+      "created_at": "2026-03-27T15:07:42.415883Z",
+      "tags": [],
+      "metadata": {
+        "target_type": null,
+        "ra_deg": 295.50122756982,
+        "dec_deg": 45.66091358955,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_OT Ser",
+      "type": "target_result",
+      "display_name": "OT Ser",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/OT Ser.json",
+      "size_bytes": 316033,
+      "created_at": "2026-04-22T12:41:51.936708Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 230.47055229613,
+        "dec_deg": 20.97775302066,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_Ross 154",
+      "type": "target_result",
+      "display_name": "Ross 154",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/Ross 154.json",
+      "size_bytes": 579352,
+      "created_at": "2026-04-22T12:42:04.753467Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 282.45568240083537,
+        "dec_deg": -23.83623538204166,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_TIC 100123009",
+      "type": "target_result",
+      "display_name": "TIC 100123009",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/TIC 100123009.json",
+      "size_bytes": 57280,
+      "created_at": "2026-07-08T00:44:56.838441+00:00",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 25.607870774570003,
+        "dec_deg": -45.95106335352,
+        "reference_count": 30
+      }
+    },
+    {
+      "id": "res_TIC 77477830",
+      "type": "target_result",
+      "display_name": "TIC 77477830",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/TIC 77477830.json",
+      "size_bytes": 19837,
+      "created_at": "2026-07-06T09:20:47.203852+00:00",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 141.63092911924,
+        "dec_deg": -1.38699016246,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_TRAPPIST-1e",
+      "type": "target_result",
+      "display_name": "TRAPPIST-1e",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/TRAPPIST-1e.json",
+      "size_bytes": 2647606,
+      "created_at": "2026-03-31T06:57:49.367768Z",
+      "tags": [
+        "planet"
+      ],
+      "metadata": {
+        "target_type": "planet",
+        "ra_deg": 346.62236872857875,
+        "dec_deg": -5.041399250518334,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_TYC 0486-4943-1",
+      "type": "target_result",
+      "display_name": "TYC 0486-4943-1",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/TYC 0486-4943-1.json",
+      "size_bytes": 80972,
+      "created_at": "2026-04-05T15:16:38.214580Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 293.26563151937,
+        "dec_deg": 3.7610289431,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_TYC 1803-1406-1",
+      "type": "target_result",
+      "display_name": "TYC 1803-1406-1",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/TYC 1803-1406-1.json",
+      "size_bytes": 118924,
+      "created_at": "2026-04-05T15:16:50.542461Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 55.86301901419459,
+        "dec_deg": 25.387583305793612,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_UCAC4 543-048061",
+      "type": "target_result",
+      "display_name": "UCAC4 543-048061",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/UCAC4 543-048061.json",
+      "size_bytes": 46561,
+      "created_at": "2026-04-05T15:17:02.523240Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 130.93334593355,
+        "dec_deg": 18.568701898410005,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_V374 Peg",
+      "type": "target_result",
+      "display_name": "V374 Peg",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/V374 Peg.json",
+      "size_bytes": 494431,
+      "created_at": "2026-04-22T12:42:44.768959Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 330.3046841623079,
+        "dec_deg": 28.306918697961663,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_V530 Per",
+      "type": "target_result",
+      "display_name": "V530 Per",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/V530 Per.json",
+      "size_bytes": 56430,
+      "created_at": "2026-04-22T12:35:49.209995Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 51.20159650031,
+        "dec_deg": 48.88884278663,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_WX UMa",
+      "type": "target_result",
+      "display_name": "WX UMa",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/WX UMa.json",
+      "size_bytes": 384267,
+      "created_at": "2026-04-22T12:42:52.748393Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 166.37868992532916,
+        "dec_deg": 43.521634777107494,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_Wolf  359",
+      "type": "target_result",
+      "display_name": "Wolf  359",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/Wolf  359.json",
+      "size_bytes": 1093812,
+      "created_at": "2026-04-05T15:34:19.546564Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 164.1205036259475,
+        "dec_deg": 7.014723134801666,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_Wolf 47",
+      "type": "target_result",
+      "display_name": "Wolf 47",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/Wolf 47.json",
+      "size_bytes": 378520,
+      "created_at": "2026-04-22T12:43:01.278081Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 15.832645862740831,
+        "dec_deg": 62.365510341287774,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "res_YZ CMi",
+      "type": "target_result",
+      "display_name": "YZ CMi",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/YZ CMi.json",
+      "size_bytes": 1084646,
+      "created_at": "2026-04-22T12:43:16.415601Z",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 116.16738460269337,
+        "dec_deg": 3.5524653409927773,
+        "reference_count": 0
+      }
+    },
+    {
+      "id": "lc_20260706T084544Z",
+      "type": "lightcurve_dataset",
+      "display_name": "AD Leo",
+      "source": "MAST",
+      "file_path": "data/lightcurves/AD Leo/20260706T084544Z",
+      "size_bytes": 15401835,
+      "created_at": "2026-07-06T08:46:06.220421+00:00",
+      "tags": [
+        "lightcurve"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [],
+        "point_count": 0,
+        "time_span_days": null,
+        "product_count": 1,
+        "validation_errors": []
+      }
+    },
+    {
+      "id": "lc_20260706T085430Z",
+      "type": "lightcurve_dataset",
+      "display_name": "AD Leo",
+      "source": "MAST",
+      "file_path": "data/lightcurves/AD Leo/20260706T085430Z",
+      "size_bytes": 1986146,
+      "created_at": "2026-07-06T08:54:45.063846+00:00",
+      "tags": [
+        "lightcurve"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [],
+        "point_count": 0,
+        "time_span_days": null,
+        "product_count": 1,
+        "validation_errors": []
+      }
+    },
+    {
+      "id": "lc_ef25350e351310f5014f46ac",
+      "type": "lightcurve_dataset",
+      "display_name": "AD Leo",
+      "source": "MAST",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c",
+      "size_bytes": 75670503,
+      "created_at": "2026-07-14T01:49:47.828692+00:00",
+      "tags": [
+        "lightcurve"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [],
+        "point_count": 0,
+        "time_span_days": null,
+        "product_count": 8,
+        "validation_errors": []
+      }
+    },
+    {
+      "id": "lc_20260707T081202Z",
+      "type": "lightcurve_dataset",
+      "display_name": "AX Mic",
+      "source": "MAST",
+      "file_path": "data/lightcurves/AX Mic/20260707T081202Z",
+      "size_bytes": 10822757,
+      "created_at": "2026-07-07T08:13:40.760386+00:00",
+      "tags": [
+        "lightcurve"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [],
+        "point_count": 0,
+        "time_span_days": null,
+        "product_count": 4,
+        "validation_errors": []
+      }
+    },
+    {
+      "id": "lc_20260706T092232Z",
+      "type": "lightcurve_dataset",
+      "display_name": "TIC 77477830",
+      "source": "MAST",
+      "file_path": "data/lightcurves/TIC 77477830/20260706T092232Z",
+      "size_bytes": 1830180,
+      "created_at": "2026-07-06T09:22:38.952464+00:00",
+      "tags": [
+        "lightcurve"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [],
+        "point_count": 0,
+        "time_span_days": null,
+        "product_count": 1,
+        "validation_errors": []
+      }
+    },
+    {
+      "id": "lc_20260713T100045Z",
+      "type": "lightcurve_dataset",
+      "display_name": "V374 Peg",
+      "source": "MAST",
+      "file_path": "data/lightcurves/V374 Peg/20260713T100045Z",
+      "size_bytes": 5689988,
+      "created_at": "2026-07-13T10:01:29.077329+00:00",
+      "tags": [
+        "lightcurve"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [],
+        "point_count": 0,
+        "time_span_days": null,
+        "product_count": 2,
+        "validation_errors": []
+      }
+    }
+  ]
+}
