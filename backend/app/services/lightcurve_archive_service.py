@@ -28,10 +28,13 @@ from .lightcurve_cache_service import (
     utc_now,
     validate_dataset_dir,
 )
+from .persistence_service import persistence
 
 LIGHT_CURVE_SUBGROUPS = {"LC", "LLC", "SLC"}
 DEFAULT_MISSIONS = {"TESS", "KEPLER", "K2"}
-SEARCH_CACHE_TTL_SECONDS = int(os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "0"))
+SEARCH_CACHE_TTL_SECONDS = int(
+    os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "21600")
+)
 
 
 def safe_target_name(name: str) -> str:
@@ -251,6 +254,13 @@ class LightCurveArchiveService:
             product_uris: set[str]) -> dict[str, Any] | None:
         """Return a validated dataset for this product set, including aliases."""
         dataset_key = stable_hash(sorted(product_uris))
+        remote = persistence.find_dataset(dataset_key)
+        if remote is not None:
+            local_dir = persistence.ensure_dataset_local(remote["download_dir"])
+            if local_dir is not None:
+                manifest = read_json(local_dir / "manifest.json")
+                if isinstance(manifest, dict):
+                    return manifest
         candidates = sorted(iter_dataset_dirs(), reverse=True)
         for run_dir in candidates:
             manifest = read_json(run_dir / "manifest.json")
@@ -392,6 +402,7 @@ class LightCurveArchiveService:
                               selected_records)
             atomic_write_json(staging_dir / "manifest.json", manifest)
             os.replace(staging_dir, final_dir)
+            persistence.save_dataset(final_dir, manifest)
             return manifest
         except Exception:
             shutil.rmtree(staging_dir, ignore_errors=True)

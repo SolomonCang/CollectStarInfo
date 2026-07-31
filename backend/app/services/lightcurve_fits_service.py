@@ -29,6 +29,7 @@ from .lightcurve_cache_service import (
     validate_dataset_dir,
 )
 from .lightcurve_service import analyze_light_curve
+from .persistence_service import persistence
 
 FLUX_CANDIDATES = (
     "PDCSAP_FLUX",
@@ -344,10 +345,9 @@ class LightCurveFitsService:
 
     def list_datasets(self, target: str | None = None) -> dict[str, Any]:
         base = DATA_ROOT / safe_target_name(target) if target else DATA_ROOT
-        if not base.exists():
-            return {"datasets": []}
-        manifests = sorted(base.rglob("manifest.json"), reverse=True)
+        manifests = sorted(base.rglob("manifest.json"), reverse=True) if base.exists() else []
         datasets: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
         for manifest_path in manifests:
             try:
                 manifest = json.loads(
@@ -398,6 +398,35 @@ class LightCurveFitsService:
                 extra["time_max"],
                 "time_span_days":
                 extra["time_span_days"],
+            })
+            if manifest.get("dataset_key"):
+                seen_keys.add(str(manifest["dataset_key"]))
+
+        for row in persistence.list_datasets(target):
+            manifest = row.get("manifest") or {}
+            dataset_key = str(row.get("dataset_key") or "")
+            if dataset_key in seen_keys:
+                continue
+            datasets.append({
+                "target": row.get("target_name"),
+                "download_dir": row.get("download_dir"),
+                "generated_at": manifest.get("generated_at"),
+                "last_accessed_at": manifest.get("last_accessed_at"),
+                "dataset_key": dataset_key,
+                "status": manifest.get("status", "complete"),
+                "valid": True,
+                "validation_errors": [],
+                "size_bytes": int(row.get("size_bytes") or 0),
+                "selected_count": manifest.get("selected_count"),
+                "manifest_entries": len(manifest.get("manifest", [])),
+                "csv_path": manifest.get("csv_path"),
+                "csv_exists": bool(manifest.get("csv_path")),
+                "csv_point_count": manifest.get("csv_point_count"),
+                "missions": manifest.get("missions", []),
+                "time_min": None,
+                "time_max": None,
+                "time_span_days": None,
+                "storage": "postgres-s3",
             })
         return {"datasets": datasets}
 
@@ -528,6 +557,7 @@ class LightCurveFitsService:
                 manifest["csv_processing_key"] = cache_info["processing_key"]
                 manifest["csv_generated_at"] = utc_now()
                 atomic_write_json(manifest_path, manifest)
+                persistence.save_dataset(download_dir, manifest)
 
         return {
             "download_dir": str(download_dir.relative_to(PROJECT_ROOT)),

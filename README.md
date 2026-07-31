@@ -40,6 +40,64 @@ npm run dev
 
 前端默认连接 `http://127.0.0.1:8000`。工作台分为“目标信息”和“光变曲线”两个页面；文献调研面板会使用 `DSAPI.key` 中的 DeepSeek API Key 和 `config.yaml` 中的模型配置，对当前目标的 SIMBAD references 和 literature workflow 做中文分析。
 
+### PostgreSQL + MinIO/S3 分离式存储
+
+默认的 `PERSISTENCE_BACKEND=filesystem` 完全兼容原来的本地目录模式。生产环境可以设置
+`PERSISTENCE_BACKEND=postgres-s3`：PostgreSQL 作为目标结果、数据集及统一目录的权威元数据源，
+MinIO 或兼容 S3 的服务保存 JSON、FITS、CSV 等对象。本地 `results/` 和 `data/` 在该模式下只作为
+可丢弃的计算缓存；任意 API 节点收到分析请求后都会按需从对象存储恢复数据集。
+
+本机启动完整环境：
+
+```bash
+cp .env.storage.example .env.storage
+# 先修改 .env.storage 中的两个密码
+docker compose --env-file .env.storage \
+  -f docker-compose.storage.yml up -d --build
+```
+
+- Web/API：`http://127.0.0.1:8000`
+- MinIO API：`http://127.0.0.1:9000`
+- MinIO 控制台：`http://127.0.0.1:9001`
+- `/api/health` 会分别报告应用和持久化后端状态。
+
+如果宿主机的 `8000` 端口已占用，可在 `.env.storage` 中设置
+`TARGET_INFO_PORT=18000`，然后通过 `http://127.0.0.1:18000` 访问。
+
+连接已有的独立服务器时，只需给 API 容器设置：
+
+```bash
+PERSISTENCE_BACKEND=postgres-s3
+DATABASE_URL=postgresql+psycopg://user:password@postgres.example:5432/target_info
+S3_ENDPOINT_URL=https://minio.example
+S3_ACCESS_KEY=...
+S3_SECRET_KEY=...
+S3_BUCKET=target-info-search
+S3_REGION=us-east-1
+S3_CREATE_BUCKET=false
+```
+
+AWS S3 可省略 `S3_ENDPOINT_URL`。生产环境应通过 Docker secret、Kubernetes Secret 或密钥管理服务
+注入密码，不要提交真实 `.env.storage`。多个 API 实例之间通过 PostgreSQL advisory lock 协调数据集
+写入，不再依赖跨服务器文件锁。
+
+已有本地数据可无损复制到远端（脚本不会删除本地文件）：
+
+```bash
+export PERSISTENCE_BACKEND=postgres-s3
+export DATABASE_URL='postgresql+psycopg://...'
+export S3_ENDPOINT_URL='https://minio.example'
+export S3_ACCESS_KEY='...'
+export S3_SECRET_KEY='...'
+export S3_BUCKET='target-info-search'
+
+python scripts/migrate_to_postgres_s3.py --dry-run
+python scripts/migrate_to_postgres_s3.py
+```
+
+应用启动时会自动创建所需表；需要由 DBA 预建表时，可执行
+`migrations/001_postgres_s3.sql`。数据库记录和对象上传均为幂等 upsert，迁移脚本可以安全重跑。
+
 目标查询默认会优先载入 `results/<target>.json` 中已有信息，避免重复访问外部数据库；在前端勾选“强制重新检索”后，会重新调用 SIMBAD/Gaia/MAST/DeepSeek，并把新的 JSON 写回 `results/`。
 
 MAST 光变曲线使用三层缓存。用户可见的数据集写入：

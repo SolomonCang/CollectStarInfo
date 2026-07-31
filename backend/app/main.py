@@ -14,6 +14,7 @@ from .services.lightcurve_archive_service import LightCurveArchiveService
 from .services.lightcurve_fits_service import LightCurveFitsService
 from .services.lightcurve_service import analyze_light_curve
 from .services.target_service import TargetSearchService
+from .services.persistence_service import persistence
 
 
 def _get_lan_ip() -> str | None:
@@ -88,6 +89,19 @@ lightcurve_cache_service = LightCurveCacheService()
 catalog_service = CatalogService()
 
 
+@app.on_event("startup")
+async def _ensure_data_dirs() -> None:
+    """Ensure data/ directories exist on first launch (not synced via git)."""
+    from pathlib import Path
+    project_root = Path(__file__).resolve().parents[3]
+    (project_root / "data" / "lightcurves").mkdir(parents=True, exist_ok=True)
+    (project_root / "results").mkdir(parents=True, exist_ok=True)
+    persistence.initialize()
+    # Rebuild catalog if missing (e.g. fresh clone)
+    if not persistence.enabled:
+        _sync_catalog()
+
+
 def _sync_catalog() -> None:
     """Rebuild unified catalog after data changes (best-effort)."""
     try:
@@ -97,8 +111,12 @@ def _sync_catalog() -> None:
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict:
+    storage = persistence.health()
+    return {
+        "status": "ok" if storage.get("status") == "ok" else "degraded",
+        "storage": storage,
+    }
 
 
 @app.post("/api/targets/query")

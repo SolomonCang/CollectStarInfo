@@ -34,6 +34,7 @@ from .lightcurve_cache_service import (
     utc_now,
     validate_dataset_dir,
 )
+from .persistence_service import persistence
 
 CATALOG_PATH = DATA_ROOT.parent / "catalog.json"
 CATALOG_VERSION = 1
@@ -95,6 +96,8 @@ def _scan_target_results() -> Iterator[dict[str, Any]]:
                 simbad.get("dec_deg"),
                 "reference_count":
                 len(target.get("literature_references", []) or []),
+                "persistence_target_key":
+                target.get("query_target") or display_name,
             },
         }
 
@@ -298,9 +301,15 @@ def _scan_lightcurve_files() -> Iterator[dict[str, Any]]:
 
 def _rebuild_catalog() -> dict[str, Any]:
     """Full scan of results/ + data/lightcurves/ → catalog.json."""
-    entries: list[dict[str, Any]] = []
-    entries.extend(_scan_target_results())
-    entries.extend(_scan_lightcurve_files())
+    local_entries: list[dict[str, Any]] = []
+    local_entries.extend(_scan_target_results())
+    local_entries.extend(_scan_lightcurve_files())
+    entries_by_id = {
+        entry["id"]: entry for entry in persistence.load_catalog()
+    }
+    entries_by_id.update({entry["id"]: entry for entry in local_entries})
+    entries = list(entries_by_id.values())
+    persistence.upsert_catalog(local_entries)
     catalog: dict[str, Any] = {
         "version": CATALOG_VERSION,
         "updated_at": utc_now(),
@@ -313,6 +322,13 @@ def _rebuild_catalog() -> dict[str, Any]:
 
 def _load_catalog() -> dict[str, Any]:
     """Return current catalog, rebuilding if missing or stale."""
+    remote_entries = persistence.load_catalog()
+    if remote_entries:
+        return {
+            "version": CATALOG_VERSION,
+            "updated_at": utc_now(),
+            "entries": remote_entries,
+        }
     if CATALOG_PATH.exists():
         catalog = read_json(CATALOG_PATH, {})
         if isinstance(catalog,
@@ -438,6 +454,27 @@ class CatalogService:
                     extra.unlink()
                 except (OSError, FileNotFoundError):
                     pass
+
+        if target_entry.get("type") == "target_result":
+            removed_bytes = max(
+                removed_bytes,
+                persistence.delete_target(
+                    target_entry.get("metadata", {}).get(
+                        "persistence_target_key"
+                    )
+                    or target_entry.get("display_name", "")
+                )
+                or 0,
+            )
+        else:
+            removed_bytes = max(
+                removed_bytes,
+                persistence.delete_dataset_object(
+                    target_entry.get("file_path", "")
+                )
+                or 0,
+            )
+        persistence.delete_catalog_entry(entry_id)
 
         # rebuild catalog
         new_catalog = _rebuild_catalog()
@@ -614,6 +651,25 @@ class CatalogService:
                     except (OSError, FileNotFoundError):
                         pass
             deleted_ids.append(entry.get("id", ""))
+            if entry.get("type") == "target_result":
+                total_removed = max(
+                    total_removed,
+                    persistence.delete_target(
+                        entry.get("metadata", {}).get(
+                            "persistence_target_key"
+                        )
+                        or display_name
+                    )
+                    or 0,
+                )
+            else:
+                total_removed += (
+                    persistence.delete_dataset_object(
+                        entry.get("file_path", "")
+                    )
+                    or 0
+                )
+            persistence.delete_catalog_entry(entry.get("id", ""))
 
         new_catalog = _rebuild_catalog()
         return {

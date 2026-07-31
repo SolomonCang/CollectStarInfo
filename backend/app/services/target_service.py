@@ -12,6 +12,7 @@ from fastapi import HTTPException
 
 from ..schemas import TargetQueryRequest
 from ..schemas import LiteratureResearchRequest
+from .persistence_service import persistence
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SRC_DIR = PROJECT_ROOT / "src"
@@ -69,6 +70,10 @@ class TargetSearchService:
         return paths
 
     def _load_existing_result(self, target: str) -> dict | None:
+        remote = persistence.load_target(target)
+        if remote is not None:
+            remote["source"] = "postgres-s3"
+            return remote
         for path in self._candidate_result_paths(target):
             if not path.exists() or path.is_dir():
                 continue
@@ -88,9 +93,10 @@ class TargetSearchService:
         path = RESULTS_DIR / f"{safe_target_filename(target)}.json"
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
                         encoding="utf-8")
+        remote_path = persistence.save_target(target, payload)
         # Trigger a catalog rebuild so the new entry is visible immediately
         self._sync_catalog()
-        return str(path.relative_to(PROJECT_ROOT))
+        return remote_path or str(path.relative_to(PROJECT_ROOT))
 
     def _sync_catalog(self) -> None:
         """Rebuild the unified catalog after writing new data."""

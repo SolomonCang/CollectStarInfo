@@ -69,12 +69,15 @@ def atomic_write_json(path: Path, value: Any) -> None:
 
 @contextmanager
 def cache_lock(key: str) -> Iterator[None]:
+    from .persistence_service import persistence
+
     LOCK_ROOT.mkdir(parents=True, exist_ok=True)
     lock_path = LOCK_ROOT / f"{stable_hash(key)}.lock"
     with lock_path.open("a+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
-            yield
+            with persistence.distributed_lock(key):
+                yield
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
@@ -88,6 +91,12 @@ def resolve_data_path(download_dir: str) -> Path:
         raise HTTPException(
             status_code=400,
             detail="download_dir must be under data/lightcurves")
+    if not resolved.exists() or not resolved.is_dir():
+        from .persistence_service import persistence
+
+        hydrated = persistence.ensure_dataset_local(download_dir)
+        if hydrated is not None:
+            resolved = hydrated.resolve()
     if not resolved.exists() or not resolved.is_dir():
         raise HTTPException(status_code=404,
                             detail=f"download_dir not found: {download_dir}")
@@ -258,7 +267,19 @@ class LightCurveCacheService:
         }
 
     def delete_dataset(self, download_dir: str) -> dict[str, Any]:
-        dataset_dir = resolve_data_path(download_dir)
+        from .persistence_service import persistence
+
+        remote_bytes = persistence.delete_dataset(download_dir)
+        try:
+            dataset_dir = resolve_data_path(download_dir)
+        except HTTPException:
+            if remote_bytes is not None:
+                return {
+                    "deleted": download_dir,
+                    "removed_bytes": remote_bytes,
+                    "storage": "postgres-s3",
+                }
+            raise
         if dataset_dir == DATA_ROOT.resolve() or CACHE_ROOT.resolve() in (
                 dataset_dir,
                 *dataset_dir.parents,
@@ -272,7 +293,11 @@ class LightCurveCacheService:
         parent = dataset_dir.parent
         if parent != DATA_ROOT and not any(parent.iterdir()):
             parent.rmdir()
-        return {"deleted": download_dir, "removed_bytes": removed_bytes}
+        return {
+            "deleted": download_dir,
+            "removed_bytes": max(removed_bytes, remote_bytes or 0),
+            "storage": "postgres-s3" if remote_bytes is not None else "filesystem",
+        }
 
     def cleanup(
         self,
@@ -367,7 +392,9 @@ class LightCurveCacheService:
                     path for path in ANALYSIS_CACHE_ROOT.glob("*.json")
                     if path.stem not in active_analysis_keys
                 ]
-            search_ttl = int(os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "0"))
+            search_ttl = int(
+                os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "21600")
+            )
             if search_ttl > 0 and SEARCH_CACHE_ROOT.exists():
                 expired_search = [
                     path for path in SEARCH_CACHE_ROOT.glob("*.json")

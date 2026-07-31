@@ -1,5 +1,6 @@
 # Environment and secrets
 .env
+.env.storage
 .venv/
 .gitignore
 
@@ -20,8 +21,7 @@ node_modules/
 
 # Local outputs
 results/
-data/lightcurves/*
-!data/lightcurves/.gitkeep
+data/
 *.log
 
 # Docker wheels (offline packages)
