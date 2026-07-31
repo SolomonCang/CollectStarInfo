@@ -7,10 +7,12 @@ from pathlib import Path
 import re
 import shutil
 import time
-from typing import Any
+from typing import Any, Callable, TypeVar
 from uuid import uuid4
 
 from fastapi import HTTPException
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout as RequestsTimeout
 
 from ..schemas import LightCurveArchiveDownloadRequest, LightCurveArchiveSearchRequest
 from .lightcurve_cache_service import (
@@ -32,9 +34,19 @@ from .persistence_service import persistence
 
 LIGHT_CURVE_SUBGROUPS = {"LC", "LLC", "SLC"}
 DEFAULT_MISSIONS = {"TESS", "KEPLER", "K2"}
+MAST_COLLECTION_NAMES = {
+    "TESS": "TESS",
+    "KEPLER": "Kepler",
+    "K2": "K2",
+}
+MAST_MAX_ATTEMPTS = max(1, int(os.getenv("MAST_MAX_ATTEMPTS", "2")))
+MAST_RETRY_BACKOFF_SECONDS = max(
+    0.0, float(os.getenv("MAST_RETRY_BACKOFF_SECONDS", "1"))
+)
 SEARCH_CACHE_TTL_SECONDS = int(
     os.getenv("LIGHTCURVE_SEARCH_CACHE_TTL", "21600")
 )
+T = TypeVar("T")
 
 
 def safe_target_name(name: str) -> str:
@@ -88,19 +100,45 @@ class LightCurveArchiveService:
         }
         return normalized or DEFAULT_MISSIONS
 
+    def _mast_collections(self, missions: set[str]) -> list[str]:
+        return [
+            MAST_COLLECTION_NAMES.get(mission, mission)
+            for mission in sorted(missions)
+        ]
+
+    def _mast_call(self, operation: Callable[[], T]) -> T:
+        for attempt in range(MAST_MAX_ATTEMPTS):
+            try:
+                return operation()
+            except (RequestsTimeout, RequestsConnectionError, TimeoutError):
+                if attempt + 1 >= MAST_MAX_ATTEMPTS:
+                    raise
+                time.sleep(MAST_RETRY_BACKOFF_SECONDS * (2 ** attempt))
+        raise RuntimeError("unreachable")
+
     def _query_observations(self,
-                            request: LightCurveArchiveSearchRequest) -> Any:
+                            request: LightCurveArchiveSearchRequest,
+                            missions: set[str]) -> Any:
         from astropy import units as u
         from astropy.coordinates import SkyCoord
         from astroquery.mast import Observations
 
+        criteria: dict[str, Any] = {
+            "obs_collection": self._mast_collections(missions),
+            "dataproduct_type": ["timeseries"],
+        }
         if request.ra_deg is not None and request.dec_deg is not None:
-            coordinates = SkyCoord(request.ra_deg,
-                                   request.dec_deg,
-                                   unit=(u.deg, u.deg))
-            return Observations.query_region(coordinates,
-                                             radius=request.radius_deg * u.deg)
-        return Observations.query_criteria(target_name=request.target)
+            criteria["coordinates"] = SkyCoord(
+                request.ra_deg,
+                request.dec_deg,
+                unit=(u.deg, u.deg),
+            )
+            criteria["radius"] = request.radius_deg * u.deg
+        else:
+            criteria["target_name"] = request.target
+        return self._mast_call(
+            lambda: Observations.query_criteria(**criteria)
+        )
 
     def _filter_observations(self, table: Any, missions: set[str]) -> Any:
         if table is None or len(
@@ -140,11 +178,13 @@ class LightCurveArchiveService:
 
         missions = self._normalized_missions(request.missions)
         observations = self._filter_observations(
-            self._query_observations(request), missions)
+            self._query_observations(request, missions), missions)
         if observations is None or len(observations) == 0:
             return None, []
 
-        products = Observations.get_product_list(observations)
+        products = self._mast_call(
+            lambda: Observations.get_product_list(observations)
+        )
         if products is None or len(products) == 0:
             return products, []
 

@@ -7,6 +7,10 @@ from fastapi import FastAPI, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .http_timeouts import install_service_timeouts
+
+install_service_timeouts()
+
 from .schemas import CatalogBatchDeleteRequest, CatalogBatchExportRequest, CatalogListRequest, LightCurveAnalysisRequest, LightCurveArchiveDownloadRequest, LightCurveArchiveSearchRequest, LightCurveCacheCleanupRequest, LightCurveCacheVerifyRequest, LightCurveDatasetAnalysisRequest, LightCurveDatasetDeleteRequest, LightCurveDatasetRequest, LiteratureResearchRequest, TargetQueryRequest
 from .services.catalog_service import CatalogService
 from .services.lightcurve_cache_service import LightCurveCacheService

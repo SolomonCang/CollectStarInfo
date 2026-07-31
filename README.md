@@ -117,6 +117,14 @@ data/lightcurves/<target>/<timestamp>-<uuid>/
 
 数据集下载使用文件锁、`.partial` 临时目录和原子重命名。缓存命中前会检查 manifest、下载状态、文件存在性和大小；深度校验还会检查 SHA-256。CSV 只在输入或处理参数变化时重新生成。
 
+MAST 检索会把坐标、半径、任务集合和 `timeseries` 产品类型直接传给
+远端服务，避免先拉取目标的全部观测再在本地过滤。外部服务采用独立超时：
+SIMBAD 默认连接/读取超时为 10/20 秒，MAST 为 10/90 秒；MAST 遇到连接或
+读取超时时默认重试一次。可通过
+`SIMBAD_CONNECT_TIMEOUT_SECONDS`、`SIMBAD_READ_TIMEOUT_SECONDS`、
+`MAST_CONNECT_TIMEOUT_SECONDS`、`MAST_READ_TIMEOUT_SECONDS`、
+`MAST_MAX_ATTEMPTS` 和 `MAST_RETRY_BACKOFF_SECONDS` 调整。
+
 下载完成后，前端会自动选中新数据集；也可以在独立“光变曲线”页面从“已下载数据集”下拉框选择历史下载。后端会读取该目录下的 `manifest.json` 和 FITS 文件，优先使用 `PDCSAP_FLUX`，应用 `QUALITY == 0` 过滤，生成 `time,flux,flux_error` CSV，并送入去趋势、Lomb-Scargle 周期搜索、频谱图和相位折叠分析。相位折叠周期可使用最佳周期，也可从频谱图点击选择或手动输入。
 
 光变曲线页面同时提供缓存占用统计、完整性校验、按保留天数/容量清理预览、执行清理和单数据集删除。清理 API 默认为 `dry_run=true`；共享产品、派生结果和分析结果只有在不再被任何数据集引用时才会回收。相关接口为：

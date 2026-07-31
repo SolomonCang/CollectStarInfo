@@ -5,10 +5,12 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from astropy import units as u
 from astropy.io import fits
 import numpy as np
+from requests.exceptions import ReadTimeout
 
 from backend.app.schemas import (
     DetrendOptions,
@@ -18,6 +20,7 @@ from backend.app.schemas import (
     LightCurveDatasetRequest,
     PeriodSearchOptions,
 )
+from backend.app.http_timeouts import default_timeout_for_url
 from backend.app.services import lightcurve_cache_service as cache_module
 from backend.app.services import lightcurve_archive_service as archive_module
 from backend.app.services import lightcurve_fits_service as fits_module
@@ -183,6 +186,56 @@ class LightCurveCacheTest(unittest.TestCase):
         self.assertFalse(first["cache"]["hit"])
         self.assertTrue(second["cache"]["hit"])
         self.assertEqual(query.call_count, 1)
+
+    def test_mast_query_sends_archive_filters_upstream(self) -> None:
+        service = archive_module.LightCurveArchiveService()
+        request = LightCurveArchiveSearchRequest(
+            target="AD Leo",
+            ra_deg=154.90117007551083,
+            dec_deg=19.87000290182528,
+            missions=["TESS", "Kepler", "K2"],
+        )
+        expected = MagicMock()
+        with patch(
+            "astroquery.mast.Observations.query_criteria",
+            return_value=expected,
+        ) as query:
+            actual = service._query_observations(
+                request, service._normalized_missions(request.missions)
+            )
+        self.assertIs(actual, expected)
+        criteria = query.call_args.kwargs
+        self.assertEqual(
+            criteria["obs_collection"], ["K2", "Kepler", "TESS"]
+        )
+        self.assertEqual(criteria["dataproduct_type"], ["timeseries"])
+        self.assertAlmostEqual(criteria["radius"].to_value(u.deg), 0.02)
+        self.assertAlmostEqual(criteria["coordinates"].ra.deg, request.ra_deg)
+        self.assertAlmostEqual(criteria["coordinates"].dec.deg, request.dec_deg)
+
+    def test_mast_call_retries_transient_timeout(self) -> None:
+        service = archive_module.LightCurveArchiveService()
+        operation = MagicMock(side_effect=[ReadTimeout("slow"), "ok"])
+        with patch.object(archive_module.time, "sleep") as sleep:
+            result = service._mast_call(operation)
+        self.assertEqual(result, "ok")
+        self.assertEqual(operation.call_count, 2)
+        sleep.assert_called_once_with(archive_module.MAST_RETRY_BACKOFF_SECONDS)
+
+    def test_external_service_timeouts_are_host_specific(self) -> None:
+        self.assertEqual(
+            default_timeout_for_url("https://mast.stsci.edu/api/v0/invoke"),
+            (10, 90),
+        )
+        self.assertEqual(
+            default_timeout_for_url(
+                "https://simbad.cds.unistra.fr/simbad/sim-tap"
+            ),
+            (10, 20),
+        )
+        self.assertIsNone(
+            default_timeout_for_url("https://example.org/api")
+        )
 
     def test_cleanup_previews_and_removes_orphan_cache_layers(self) -> None:
         product = self.cache_root / "products" / "orphan-product"
