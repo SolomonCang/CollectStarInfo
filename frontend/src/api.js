@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const API_BASE = import.meta.env?.VITE_API_BASE ?? "";
 
 async function request(path, options) {
   const headers = new Headers(options?.headers);
@@ -31,15 +31,17 @@ async function request(path, options) {
     : response.text();
 }
 
-export function queryTarget(payload) {
+export function queryTarget(payload, options = {}) {
   return request("/api/targets/query", {
+    ...options,
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export function researchLiterature(payload) {
+export function researchLiterature(payload, options = {}) {
   return request("/api/literature/research", {
+    ...options,
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -66,9 +68,9 @@ export function downloadLightCurves(payload) {
   });
 }
 
-export function listLightCurveDatasets(target) {
+export function listLightCurveDatasets(target, options) {
   const params = target ? `?target=${encodeURIComponent(target)}` : "";
-  return request(`/api/lightcurves/datasets${params}`);
+  return request(`/api/lightcurves/datasets${params}`, options);
 }
 
 export function deleteLightCurveDataset(downloadDir) {
