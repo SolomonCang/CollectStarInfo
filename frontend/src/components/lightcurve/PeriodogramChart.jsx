@@ -63,7 +63,8 @@ export default function PeriodogramChart({
       x: freqs,
       y: powers,
       customdata: periods,
-      type: "scattergl",
+      // SVG rendering keeps the chart usable when WebGL is unavailable or disabled.
+      type: "scatter",
       mode: "lines",
       line: { color: "#b45309", width: 1.8 },
       hovertemplate:

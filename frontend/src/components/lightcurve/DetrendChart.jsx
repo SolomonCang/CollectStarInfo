@@ -46,7 +46,8 @@ export default function DetrendChart({ curve, loading }) {
   const trace = {
     x: times,
     y: fluxes,
-    type: "scattergl",
+    // SVG rendering keeps the chart usable when WebGL is unavailable or disabled.
+    type: "scatter",
     mode: "lines",
     line: { color: "#0f766e", width: 1.5 },
     text: segTexts,
