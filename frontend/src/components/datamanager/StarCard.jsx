@@ -13,6 +13,8 @@ import {
   BookOpen,
   Calendar,
   AlertCircle,
+  File,
+  Table2,
 } from "lucide-react";
 
 const TYPE_LABELS = {
@@ -49,13 +51,13 @@ export default function StarCard({
   onDelete,
   busy,
 }) {
-  const { name, target_entry, lc_entries, total_size_bytes, entry_count, has_lc, has_target } = star;
+  const { name, normalized, target_entry, lc_entries, total_size_bytes, entry_count, has_lc, has_target } = star;
   const meta = target_entry?.metadata || {};
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleDelete = () => {
     if (showDeleteConfirm) {
-      onDelete(name);
+      onDelete(normalized);
       setShowDeleteConfirm(false);
     } else {
       setShowDeleteConfirm(true);
@@ -75,14 +77,14 @@ export default function StarCard({
   return (
     <div className={`dm-star-card${expanded ? " expanded" : ""}${selected ? " selected" : ""}`}>
       {/* ── Card header ── */}
-      <div className="dm-star-header" onClick={() => onToggleExpand(name)}>
+      <div className="dm-star-header" onClick={() => onToggleExpand(normalized)}>
         <input
           type="checkbox"
           className="dm-star-checkbox"
           checked={selected}
           onChange={(e) => {
             e.stopPropagation();
-            onToggleSelect(name);
+            onToggleSelect(normalized);
           }}
           onClick={(e) => e.stopPropagation()}
           disabled={busy}
@@ -218,13 +220,13 @@ export default function StarCard({
             <div className="dm-star-section">
               <h4 className="dm-section-title">
                 <Activity size={14} />
-                光变曲线数据集 ({lc_entries.length})
+                光变曲线文件 ({lc_entries.length})
               </h4>
               <div className="dm-lc-table-wrap">
                 <table className="dm-lc-table">
                   <thead>
                     <tr>
-                      <th>来源</th>
+                      <th>文件名</th>
                       <th>任务</th>
                       <th>数据点</th>
                       <th>时间跨度</th>
@@ -233,14 +235,33 @@ export default function StarCard({
                     </tr>
                   </thead>
                   <tbody>
-                    {lc_entries.map((lc) => (
+                    {lc_entries.map((lc) => {
+                      const isFits = lc.type === "lightcurve_file" || lc.metadata?.file_type === "fits";
+                      const isCsv = lc.type === "lightcurve_derived" || lc.metadata?.file_type === "csv";
+                      const isOldDataset = lc.type === "lightcurve_dataset";
+                      const fileName = lc.metadata?.filename || lc.file_path?.split("/").pop() || "-";
+                      const obsId = lc.metadata?.obs_id || "";
+                      return (
                       <tr key={lc.id}>
-                        <td>{lc.source}</td>
+                        <td>
+                          <div className="dm-file-cell">
+                            {isFits ? <File size={14} className="dm-file-icon-fits" /> : null}
+                            {isCsv ? <Table2 size={14} className="dm-file-icon-csv" /> : null}
+                            {isOldDataset ? <Database size={14} className="dm-file-icon-ds" /> : null}
+                            <span className="dm-filename" title={fileName}>{fileName}</span>
+                            {obsId ? <span className="dm-obsid">{obsId}</span> : null}
+                          </div>
+                        </td>
                         <td>
                           <div className="dm-tag-row">
                             {(lc.metadata?.missions || []).map((m) => (
                               <span key={m} className="dm-tag">{m}</span>
                             ))}
+                            {!isOldDataset ? (
+                              <span className={"dm-tag dm-tag-type" + (isFits ? " dm-tag-fits" : " dm-tag-csv")}>
+                                {isFits ? "FITS" : isCsv ? "CSV" : ""}
+                              </span>
+                            ) : null}
                           </div>
                         </td>
                         <td>{lc.metadata?.point_count?.toLocaleString() || "-"}</td>
@@ -256,7 +277,8 @@ export default function StarCard({
                           )}
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>

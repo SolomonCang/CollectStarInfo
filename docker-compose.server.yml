@@ -1,0 +1,14 @@
+services:
+  target-info-search:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: target-info-search
+    ports:
+      - "127.0.0.1:18000:8000"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+    restart: unless-stopped

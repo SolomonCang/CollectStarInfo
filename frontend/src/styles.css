@@ -1362,6 +1362,48 @@ label {
   flex-wrap: wrap;
   gap: 4px;
 }
+.dm-tag-type {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.dm-tag-fits {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-soft);
+}
+.dm-tag-csv {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-color: #c8e6c9;
+}
+
+/* ── File cell ── */
+.dm-file-cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.dm-file-icon-fits { color: var(--primary); flex-shrink: 0; }
+.dm-file-icon-csv { color: #2e7d32; flex-shrink: 0; }
+.dm-file-icon-ds { color: var(--fg-soft); flex-shrink: 0; }
+.dm-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.78rem;
+}
+.dm-obsid {
+  font-size: 0.7rem;
+  color: var(--fg-soft);
+  background: var(--bg-muted);
+  padding: 0 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 
 .dm-badge {
   display: inline-block;

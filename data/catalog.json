@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-14T02:31:59.831545+00:00",
+  "updated_at": "2026-07-26T08:12:15.309661+00:00",
   "entries": [
     {
       "id": "res_AD Leo",
@@ -142,6 +142,24 @@
         "ra_deg": 73.20633578512,
         "dec_deg": -19.917133182970005,
         "reference_count": 0
+      }
+    },
+    {
+      "id": "res_BP Tau",
+      "type": "target_result",
+      "display_name": "BP Tau",
+      "source": "SIMBAD+Gaia",
+      "file_path": "results/BP Tau.json",
+      "size_bytes": 2251490,
+      "created_at": "2026-07-26T08:12:14.547209+00:00",
+      "tags": [
+        "star"
+      ],
+      "metadata": {
+        "target_type": "star",
+        "ra_deg": 64.81597492818,
+        "dec_deg": 29.10747971097,
+        "reference_count": 728
       }
     },
     {
@@ -897,123 +915,519 @@
       }
     },
     {
-      "id": "lc_20260706T084544Z",
-      "type": "lightcurve_dataset",
+      "id": "fits_9382a0f6aec20160",
+      "type": "lightcurve_file",
       "display_name": "AD Leo",
-      "source": "MAST",
-      "file_path": "data/lightcurves/AD Leo/20260706T084544Z",
-      "size_bytes": 15401835,
-      "created_at": "2026-07-06T08:46:06.220421+00:00",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260706T084544Z/mastDownload/TESS/tess2021310001228-s0045-0000000095431305-0216-a_fast/tess2021310001228-s0045-0000000095431305-0216-a_fast-lc.fits",
+      "size_bytes": 10883520,
+      "created_at": "2026-07-06T08:46:06.219578+00:00",
       "tags": [
-        "lightcurve"
+        "lightcurve",
+        "tess"
       ],
       "valid": true,
       "metadata": {
-        "missions": [],
-        "point_count": 0,
-        "time_span_days": null,
-        "product_count": 1,
-        "validation_errors": []
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 108540,
+        "time_span_days": 25.13,
+        "filename": "tess2021310001228-s0045-0000000095431305-0216-a_fast-lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
       }
     },
     {
-      "id": "lc_20260706T085430Z",
-      "type": "lightcurve_dataset",
+      "id": "fits_e187985914fb3384",
+      "type": "lightcurve_file",
       "display_name": "AD Leo",
-      "source": "MAST",
-      "file_path": "data/lightcurves/AD Leo/20260706T085430Z",
-      "size_bytes": 1986146,
-      "created_at": "2026-07-06T08:54:45.063846+00:00",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260706T085430Z/mastDownload/TESS/tess2021336043614-s0046-0000000095431305-0217-s/tess2021336043614-s0046-0000000095431305-0217-s_lc.fits",
+      "size_bytes": 1984320,
+      "created_at": "2026-07-06T08:54:45.061612+00:00",
       "tags": [
-        "lightcurve"
+        "lightcurve",
+        "tess"
       ],
       "valid": true,
       "metadata": {
-        "missions": [],
-        "point_count": 0,
-        "time_span_days": null,
-        "product_count": 1,
-        "validation_errors": []
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 19542,
+        "time_span_days": 27.14,
+        "filename": "tess2021336043614-s0046-0000000095431305-0217-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
       }
     },
     {
-      "id": "lc_ef25350e351310f5014f46ac",
-      "type": "lightcurve_dataset",
+      "id": "fits_b81e94c2cfede06b",
+      "type": "lightcurve_file",
       "display_name": "AD Leo",
-      "source": "MAST",
-      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c",
-      "size_bytes": 75670503,
-      "created_at": "2026-07-14T01:49:47.828692+00:00",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/products/000-tess2021310001228-s0045-0000000095431305-0216-a_fast-lc.fits",
+      "size_bytes": 10883520,
+      "created_at": "2026-07-14T01:46:08.910304+00:00",
       "tags": [
-        "lightcurve"
+        "lightcurve",
+        "tess"
       ],
       "valid": true,
       "metadata": {
-        "missions": [],
-        "point_count": 0,
-        "time_span_days": null,
-        "product_count": 8,
-        "validation_errors": []
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 108540,
+        "time_span_days": 25.13,
+        "filename": "000-tess2021310001228-s0045-0000000095431305-0216-a_fast-lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
       }
     },
     {
-      "id": "lc_20260707T081202Z",
-      "type": "lightcurve_dataset",
+      "id": "fits_1810af408934c402",
+      "type": "lightcurve_file",
+      "display_name": "AD Leo",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/products/001-tess2021310001228-s0045-0000000095431305-0216-s_lc.fits",
+      "size_bytes": 1840320,
+      "created_at": "2026-07-14T01:46:26.434945+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 18089,
+        "time_span_days": 25.12,
+        "filename": "001-tess2021310001228-s0045-0000000095431305-0216-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_cfd54efa769a5117",
+      "type": "lightcurve_file",
+      "display_name": "AD Leo",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/products/002-tess2021336043614-s0046-0000000095431305-0217-a_fast-lc.fits",
+      "size_bytes": 11756160,
+      "created_at": "2026-07-14T01:46:38.961340+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 117255,
+        "time_span_days": 27.14,
+        "filename": "002-tess2021336043614-s0046-0000000095431305-0217-a_fast-lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_7e080064c6ba4733",
+      "type": "lightcurve_file",
+      "display_name": "AD Leo",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/products/003-tess2021336043614-s0046-0000000095431305-0217-s_lc.fits",
+      "size_bytes": 1984320,
+      "created_at": "2026-07-14T01:46:44.730599+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 19542,
+        "time_span_days": 27.14,
+        "filename": "003-tess2021336043614-s0046-0000000095431305-0217-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_0690b137c897c10a",
+      "type": "lightcurve_file",
+      "display_name": "AD Leo",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/products/004-tess2022027120115-s0048-0000000095431305-0219-a_fast-lc.fits",
+      "size_bytes": 12150720,
+      "created_at": "2026-07-14T01:47:38.365440+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 121215,
+        "time_span_days": 28.06,
+        "filename": "004-tess2022027120115-s0048-0000000095431305-0219-a_fast-lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_f7dbeec23fc67027",
+      "type": "lightcurve_file",
+      "display_name": "AD Leo",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/products/005-tess2022027120115-s0048-0000000095431305-0219-s_lc.fits",
+      "size_bytes": 2050560,
+      "created_at": "2026-07-14T01:46:50.493567+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 20202,
+        "time_span_days": 28.06,
+        "filename": "005-tess2022027120115-s0048-0000000095431305-0219-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_698c8eabebdef0bf",
+      "type": "lightcurve_file",
+      "display_name": "AD Leo",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/products/006-tess2023315124025-s0072-0000000095431305-0267-a_fast-lc.fits",
+      "size_bytes": 11004480,
+      "created_at": "2026-07-14T01:49:47.789527+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 109756,
+        "time_span_days": 25.41,
+        "filename": "006-tess2023315124025-s0072-0000000095431305-0267-a_fast-lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_38b1c4ce950bcd83",
+      "type": "lightcurve_file",
+      "display_name": "AD Leo",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/products/007-tess2023315124025-s0072-0000000095431305-0267-s_lc.fits",
+      "size_bytes": 1860480,
+      "created_at": "2026-07-14T01:47:46.608472+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 18292,
+        "time_span_days": 25.41,
+        "filename": "007-tess2023315124025-s0072-0000000095431305-0267-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "csv_9bc94e90bb780962",
+      "type": "lightcurve_derived",
+      "display_name": "AD Leo",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260706T084544Z/lightcurve.csv",
+      "size_bytes": 4516344,
+      "created_at": "2026-07-06T08:59:08.332836+00:00",
+      "tags": [
+        "lightcurve",
+        "derived",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 89867,
+        "time_span_days": 24.37,
+        "filename": "lightcurve.csv",
+        "file_type": "csv"
+      }
+    },
+    {
+      "id": "csv_4fa13017854072f7",
+      "type": "lightcurve_derived",
+      "display_name": "AD Leo",
+      "source": "MAST/K2/KEPLER/TESS",
+      "file_path": "data/lightcurves/AD Leo/20260714T014947826547Z-2c421f1c/lightcurve.csv",
+      "size_bytes": 22128435,
+      "created_at": "2026-07-14T01:49:49.002712+00:00",
+      "tags": [
+        "lightcurve",
+        "derived",
+        "k2",
+        "kepler",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "K2",
+          "KEPLER",
+          "TESS"
+        ],
+        "point_count": 429643,
+        "time_span_days": 759.32,
+        "filename": "lightcurve.csv",
+        "file_type": "csv"
+      }
+    },
+    {
+      "id": "fits_dc53a2a2387a1282",
+      "type": "lightcurve_file",
       "display_name": "AX Mic",
-      "source": "MAST",
-      "file_path": "data/lightcurves/AX Mic/20260707T081202Z",
-      "size_bytes": 10822757,
-      "created_at": "2026-07-07T08:13:40.760386+00:00",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AX Mic/20260707T081202Z/mastDownload/TESS/tess2018206045859-s0001-0000000159746875-0120-s/tess2018206045859-s0001-0000000159746875-0120-s_lc.fits",
+      "size_bytes": 2039040,
+      "created_at": "2026-07-07T08:12:31.003780+00:00",
       "tags": [
-        "lightcurve"
+        "lightcurve",
+        "tess"
       ],
       "valid": true,
       "metadata": {
-        "missions": [],
-        "point_count": 0,
-        "time_span_days": null,
-        "product_count": 4,
-        "validation_errors": []
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 20076,
+        "time_span_days": 27.88,
+        "filename": "tess2018206045859-s0001-0000000159746875-0120-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
       }
     },
     {
-      "id": "lc_20260706T092232Z",
-      "type": "lightcurve_dataset",
+      "id": "fits_5b46f19c49916e44",
+      "type": "lightcurve_file",
+      "display_name": "AX Mic",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AX Mic/20260707T081202Z/mastDownload/TESS/tess2020212050318-s0028-0000000159746875-0190-s/tess2020212050318-s0028-0000000159746875-0190-s_lc.fits",
+      "size_bytes": 1848960,
+      "created_at": "2026-07-07T08:12:20.247871+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 18182,
+        "time_span_days": 25.25,
+        "filename": "tess2020212050318-s0028-0000000159746875-0190-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_33ba69fe54e58356",
+      "type": "lightcurve_file",
+      "display_name": "AX Mic",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AX Mic/20260707T081202Z/mastDownload/TESS/tess2023209231226-s0068-0000000159746875-0262-s/tess2023209231226-s0068-0000000159746875-0262-s_lc.fits",
+      "size_bytes": 2013120,
+      "created_at": "2026-07-07T08:13:00.093791+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 19824,
+        "time_span_days": 27.53,
+        "filename": "tess2023209231226-s0068-0000000159746875-0262-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_e916566d1c4d530f",
+      "type": "lightcurve_file",
+      "display_name": "AX Mic",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/AX Mic/20260707T081202Z/mastDownload/TESS/tess2025206162959-s0095-0000000159746875-0292-s/tess2025206162959-s0095-0000000159746875-0292-s_lc.fits",
+      "size_bytes": 1846080,
+      "created_at": "2026-07-07T08:13:40.758469+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 18167,
+        "time_span_days": 25.23,
+        "filename": "tess2025206162959-s0095-0000000159746875-0292-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "csv_855706f777c8fa5f",
+      "type": "lightcurve_derived",
+      "display_name": "AX Mic",
+      "source": "MAST/K2/KEPLER/TESS",
+      "file_path": "data/lightcurves/AX Mic/20260707T081202Z/lightcurve.csv",
+      "size_bytes": 3070658,
+      "created_at": "2026-07-07T08:13:40.884745+00:00",
+      "tags": [
+        "lightcurve",
+        "derived",
+        "k2",
+        "kepler",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "K2",
+          "KEPLER",
+          "TESS"
+        ],
+        "point_count": 62265,
+        "time_span_days": 2581.83,
+        "filename": "lightcurve.csv",
+        "file_type": "csv"
+      }
+    },
+    {
+      "id": "fits_0db68262105cba4d",
+      "type": "lightcurve_file",
       "display_name": "TIC 77477830",
-      "source": "MAST",
-      "file_path": "data/lightcurves/TIC 77477830/20260706T092232Z",
-      "size_bytes": 1830180,
-      "created_at": "2026-07-06T09:22:38.952464+00:00",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/TIC 77477830/20260706T092232Z/mastDownload/TESS/tess2021039152502-s0035-0000000077477830-0205-s/tess2021039152502-s0035-0000000077477830-0205-s_lc.fits",
+      "size_bytes": 1828800,
+      "created_at": "2026-07-06T09:22:38.950737+00:00",
       "tags": [
-        "lightcurve"
+        "lightcurve",
+        "tess"
       ],
       "valid": true,
       "metadata": {
-        "missions": [],
-        "point_count": 0,
-        "time_span_days": null,
-        "product_count": 1,
-        "validation_errors": []
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 17997,
+        "time_span_days": 24.99,
+        "filename": "tess2021039152502-s0035-0000000077477830-0205-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
       }
     },
     {
-      "id": "lc_20260713T100045Z",
-      "type": "lightcurve_dataset",
+      "id": "fits_148ff29aa59e1ec9",
+      "type": "lightcurve_file",
       "display_name": "V374 Peg",
-      "source": "MAST",
-      "file_path": "data/lightcurves/V374 Peg/20260713T100045Z",
-      "size_bytes": 5689988,
-      "created_at": "2026-07-13T10:01:29.077329+00:00",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/V374 Peg/20260713T100045Z/mastDownload/TESS/tess2019226182529-s0015-0000000283410775-0151-s/tess2019226182529-s0015-0000000283410775-0151-s_lc.fits",
+      "size_bytes": 1906560,
+      "created_at": "2026-07-13T10:01:08.256800+00:00",
       "tags": [
-        "lightcurve"
+        "lightcurve",
+        "tess"
       ],
       "valid": true,
       "metadata": {
-        "missions": [],
-        "point_count": 0,
-        "time_span_days": null,
-        "product_count": 2,
-        "validation_errors": []
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 18757,
+        "time_span_days": 26.05,
+        "filename": "tess2019226182529-s0015-0000000283410775-0151-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "fits_fae383cb1562cb8b",
+      "type": "lightcurve_file",
+      "display_name": "V374 Peg",
+      "source": "MAST/TESS",
+      "file_path": "data/lightcurves/V374 Peg/20260713T100045Z/mastDownload/TESS/tess2022244194134-s0056-0000000283410775-0243-s/tess2022244194134-s0056-0000000283410775-0243-s_lc.fits",
+      "size_bytes": 2039040,
+      "created_at": "2026-07-13T10:01:29.075455+00:00",
+      "tags": [
+        "lightcurve",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "TESS"
+        ],
+        "point_count": 20079,
+        "time_span_days": 27.89,
+        "filename": "tess2022244194134-s0056-0000000283410775-0243-s_lc.fits",
+        "obs_id": "",
+        "file_type": "fits"
+      }
+    },
+    {
+      "id": "csv_c09702dad4d84db5",
+      "type": "lightcurve_derived",
+      "display_name": "V374 Peg",
+      "source": "MAST/K2/KEPLER/TESS",
+      "file_path": "data/lightcurves/V374 Peg/20260713T100045Z/lightcurve.csv",
+      "size_bytes": 1741720,
+      "created_at": "2026-07-13T10:01:29.156138+00:00",
+      "tags": [
+        "lightcurve",
+        "derived",
+        "k2",
+        "kepler",
+        "tess"
+      ],
+      "valid": true,
+      "metadata": {
+        "missions": [
+          "K2",
+          "KEPLER",
+          "TESS"
+        ],
+        "point_count": 32755,
+        "time_span_days": 1141.77,
+        "filename": "lightcurve.csv",
+        "file_type": "csv"
       }
     }
   ]

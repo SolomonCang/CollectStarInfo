@@ -13,6 +13,8 @@ explicitly deletes it.
 
 from __future__ import annotations
 
+import csv
+import hashlib
 import json
 import os
 from datetime import datetime, timezone
@@ -22,6 +24,7 @@ from typing import Any, Iterator
 from fastapi import HTTPException
 
 from .lightcurve_cache_service import (
+    CACHE_ROOT,
     DATA_ROOT,
     PROJECT_ROOT,
     atomic_write_json,
@@ -96,76 +99,208 @@ def _scan_target_results() -> Iterator[dict[str, Any]]:
         }
 
 
-def _scan_lightcurve_datasets() -> Iterator[dict[str, Any]]:
-    """Yield one catalog entry per valid light-curve dataset directory."""
-    for dataset_dir in sorted(iter_dataset_dirs()):
-        ok, errors, manifest = validate_dataset_dir(dataset_dir)
-        if manifest is None:
-            manifest = {}
-        rel_path = str(dataset_dir.relative_to(PROJECT_ROOT))
-        size = unique_storage_size(iter([dataset_dir]))
-        created_at = manifest.get("generated_at") or datetime.fromtimestamp(
-            dataset_dir.stat().st_mtime, tz=timezone.utc).isoformat()
-        entries = manifest.get("manifest", [])
-        missions: list[str] = []
-        seen: set[str] = set()
-        for entry in entries:
-            m = entry.get("mission") or entry.get("obs_collection")
-            if m and m not in seen:
-                missions.append(m)
-                seen.add(m)
+def _file_hash(path: str) -> str:
+    """Short stable hash for a file path string."""
+    return hashlib.sha256(path.encode()).hexdigest()[:16]
 
-        point_count = 0
-        time_span_days: float | None = None
-        csv_info = manifest.get("csv", {})
-        if isinstance(csv_info, dict):
-            point_count = csv_info.get("point_count", 0)
-            time_span_days = csv_info.get("time_span_days")
 
-        dataset_id = manifest.get("dataset_key") or Path(rel_path).name
-        tags = ["lightcurve"] + [m.lower() for m in missions]
-        products_file = dataset_dir / "selected_products.json"
-        products = read_json(products_file, [])
-        target_name = ""
-        if products:
-            target_name = products[0].get("target_name", "") if isinstance(
-                products, list) and products else ""
+def _find_manifest_for_file(file_path: Path) -> dict[str, Any]:
+    """Walk up from file_path to find the nearest manifest.json."""
+    current = file_path.parent
+    for _ in range(5):
+        manifest = read_json(current / "manifest.json")
+        if isinstance(manifest, dict):
+            return manifest
+        if current.parent == current or current == DATA_ROOT:
+            break
+        current = current.parent
+    return {}
 
-        yield {
-            "id":
-            f"lc_{dataset_id[:24]}",
-            "type":
-            "lightcurve_dataset",
-            "display_name":
-            target_name or manifest.get("target_name")
-            or dataset_dir.parent.name,
-            "source":
-            f"MAST/{'/'.join(missions)}" if missions else "MAST",
-            "file_path":
-            rel_path,
-            "size_bytes":
-            size,
-            "created_at":
-            created_at,
-            "tags":
-            tags,
-            "valid":
-            ok,
-            "metadata": {
-                "missions": missions,
-                "point_count": point_count,
-                "time_span_days": time_span_days,
-                "product_count": len(entries),
-                "validation_errors": errors if not ok else [],
-            },
-        }
+
+def _guess_mission_from_path(file_path: Path) -> str:
+    """Guess mission from FITS file path (e.g., .../TESS/...)."""
+    parts = {p.upper() for p in file_path.parts}
+    for mission in ("TESS", "KEPLER", "K2"):
+        if mission in parts:
+            return mission
+    # Try from filename
+    name = file_path.name.lower()
+    if "tess" in name:
+        return "TESS"
+    if "kepler" in name:
+        return "KEPLER"
+    if "k2" in name:
+        return "K2"
+    return ""
+
+
+def _read_fits_metadata(fits_path: Path) -> dict[str, Any]:
+    """Read basic metadata from a FITS lightcurve file.
+
+    Returns point_count, time_span_days, obs_id without loading full data.
+    """
+    result: dict[str, Any] = {
+        "point_count": 0,
+        "time_span_days": None,
+        "obs_id": "",
+    }
+    try:
+        from astropy.io import fits as astropy_fits
+        import numpy as np
+
+        with astropy_fits.open(fits_path, memmap=False) as hdul:
+            for hdu in hdul:
+                data = getattr(hdu, "data", None)
+                cols = getattr(data, "columns", None) if data is not None else None
+                names = [] if cols is None else [c.upper() for c in cols.names]
+                if "TIME" not in names:
+                    continue
+                time_col = data["TIME"]
+                if len(time_col) > 0:
+                    result["point_count"] = int(len(time_col))
+                    span = float(np.nanmax(time_col) - np.nanmin(time_col))
+                    if np.isfinite(span):
+                        result["time_span_days"] = round(span, 2)
+                break
+            # Read obs_id from primary header
+            if len(hdul) > 0:
+                header = hdul[0].header
+                result["obs_id"] = str(header.get("OBSID", header.get("OBS_ID", "")))
+    except Exception:
+        pass
+    return result
+
+
+def _scan_lightcurve_files() -> Iterator[dict[str, Any]]:
+    """Yield one catalog entry per unique lightcurve FITS or derived CSV file.
+
+    Scans ``data/lightcurves/<Star>/`` directories, deduplicates by inode
+    (so hard-linked files from the product cache are counted once), and
+    produces file-level entries similar to how MAST presents individual
+    observations.
+    """
+    if not DATA_ROOT.exists():
+        return
+
+    seen_inodes: set[tuple[int, int]] = set()
+
+    for star_dir in sorted(DATA_ROOT.iterdir()):
+        if not star_dir.is_dir():
+            continue
+        if star_dir.name.startswith(".") or star_dir.name.startswith("_"):
+            continue
+
+        star_name = star_dir.name
+
+        # ── FITS files ──
+        fits_paths: list[Path] = []
+        for pattern in ("*.fits", "*.fits.gz"):
+            fits_paths.extend(star_dir.rglob(pattern))
+
+        for fits_path in sorted(fits_paths):
+            if not fits_path.is_file():
+                continue
+            try:
+                stat = fits_path.stat()
+                inode_key = (stat.st_dev, stat.st_ino)
+                if inode_key in seen_inodes:
+                    continue  # hardlink duplicate
+                seen_inodes.add(inode_key)
+            except OSError:
+                continue
+
+            manifest = _find_manifest_for_file(fits_path)
+            mission = _guess_mission_from_path(fits_path)
+            fits_meta = _read_fits_metadata(fits_path)
+
+            rel_path = str(fits_path.relative_to(PROJECT_ROOT))
+
+            yield {
+                "id": f"fits_{_file_hash(rel_path)}",
+                "type": "lightcurve_file",
+                "display_name": star_name,
+                "source": f"MAST/{mission}" if mission else "MAST",
+                "file_path": rel_path,
+                "size_bytes": stat.st_size,
+                "created_at": datetime.fromtimestamp(
+                    stat.st_mtime, tz=timezone.utc).isoformat(),
+                "tags": ["lightcurve"]
+                + ([mission.lower()] if mission else []),
+                "valid": fits_meta["point_count"] > 0,
+                "metadata": {
+                    "missions": [mission] if mission else [],
+                    "point_count": fits_meta["point_count"],
+                    "time_span_days": fits_meta["time_span_days"],
+                    "filename": fits_path.name,
+                    "obs_id": fits_meta.get("obs_id", ""),
+                    "file_type": "fits",
+                },
+            }
+
+        # ── Derived CSV files ──
+        csv_paths: list[Path] = list(star_dir.rglob("lightcurve.csv"))
+        for csv_path in sorted(csv_paths):
+            if not csv_path.is_file():
+                continue
+            try:
+                stat = csv_path.stat()
+                inode_key = (stat.st_dev, stat.st_ino)
+                if inode_key in seen_inodes:
+                    continue
+                seen_inodes.add(inode_key)
+            except OSError:
+                continue
+
+            manifest = _find_manifest_for_file(csv_path)
+            missions: list[str] = manifest.get("missions", [])
+
+            point_count = 0
+            time_span_days: float | None = None
+            try:
+                times: list[float] = []
+                with csv_path.open("r", encoding="utf-8") as handle:
+                    reader = csv.DictReader(handle)
+                    for row in reader:
+                        try:
+                            t = float(row.get("time") or 0)
+                            times.append(t)
+                        except (ValueError, TypeError):
+                            continue
+                if times:
+                    point_count = len(times)
+                    time_span_days = round(max(times) - min(times), 2)
+            except Exception:
+                pass
+
+            rel_path = str(csv_path.relative_to(PROJECT_ROOT))
+
+            yield {
+                "id": f"csv_{_file_hash(rel_path)}",
+                "type": "lightcurve_derived",
+                "display_name": star_name,
+                "source": f"MAST/{'/'.join(missions)}" if missions else "MAST",
+                "file_path": rel_path,
+                "size_bytes": stat.st_size,
+                "created_at": datetime.fromtimestamp(
+                    stat.st_mtime, tz=timezone.utc).isoformat(),
+                "tags": ["lightcurve", "derived"]
+                + [m.lower() for m in missions],
+                "valid": True,
+                "metadata": {
+                    "missions": missions,
+                    "point_count": point_count,
+                    "time_span_days": time_span_days,
+                    "filename": csv_path.name,
+                    "file_type": "csv",
+                },
+            }
 
 
 def _rebuild_catalog() -> dict[str, Any]:
     """Full scan of results/ + data/lightcurves/ → catalog.json."""
     entries: list[dict[str, Any]] = []
     entries.extend(_scan_target_results())
-    entries.extend(_scan_lightcurve_datasets())
+    entries.extend(_scan_lightcurve_files())
     catalog: dict[str, Any] = {
         "version": CATALOG_VERSION,
         "updated_at": utc_now(),
@@ -374,13 +509,14 @@ class CatalogService:
                 order.append(key)
             group = groups[key]
             group["total_size_bytes"] += entry.get("size_bytes", 0) or 0
-            if entry.get("type") == "target_result":
+            etype = entry.get("type", "")
+            if etype == "target_result":
                 if group["target_entry"] is None:  # keep first
                     group["target_entry"] = entry
                 else:
                     group["total_size_bytes"] += entry.get("size_bytes",
                                                            0) or 0
-            elif entry.get("type") == "lightcurve_dataset":
+            elif etype in ("lightcurve_file", "lightcurve_derived", "lightcurve_dataset"):
                 group["lc_entries"].append(entry)
 
         # Build star list
