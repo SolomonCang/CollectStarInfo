@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { lazy, Suspense, useState, useCallback, useEffect } from "react";
 import { useLightCurveState } from "./hooks/useLightCurveState";
 import {
   queryTarget,
@@ -12,9 +12,15 @@ import {
   cleanupLightCurveCache,
 } from "./api";
 import TargetPage from "./components/target/TargetPage";
-import LightCurvePage from "./components/lightcurve/LightCurvePage";
-import DataManagerPage from "./components/datamanager/DataManagerPage";
-import "./styles.css";
+
+const LightCurvePage = lazy(() => import("./components/lightcurve/LightCurvePage"));
+const DataManagerPage = lazy(() => import("./components/datamanager/DataManagerPage"));
+
+const PAGE_TITLES = {
+  target: "Target Info Search",
+  lightcurves: "Light Curve Lab",
+  data: "Data Manager",
+};
 
 function targetDisplayName(result, fallback) {
   const t = result?.target;
@@ -51,11 +57,10 @@ export default function App() {
   }, [lc.dispatch]);
 
   useEffect(() => {
-    refreshCacheStats();
-  }, [refreshCacheStats]);
-
-  // ── Shared error ──
-  const error = page === "target" ? targetError : lc.error;
+    if (page === "lightcurves") {
+      refreshCacheStats();
+    }
+  }, [page, refreshCacheStats]);
 
   // ── Target query (used by both pages) ──
   const handleTargetQuery = useCallback(async (event) => {
@@ -65,6 +70,8 @@ export default function App() {
     if (page === "target") {
       setTargetError("");
       setTargetBusy(true);
+    } else {
+      lc.dispatch({ type: "TARGET_QUERY_START" });
     }
 
     try {
@@ -108,7 +115,15 @@ export default function App() {
         lc.dispatch({ type: "TARGET_QUERY_ERROR", payload: caught.message });
       }
     }
-  }, [page, targetName, lc.targetName, useLlm, forceRefresh, lc]);
+  }, [
+    page,
+    targetName,
+    lc.targetName,
+    useLlm,
+    forceRefresh,
+    lc.dispatch,
+    lc.handleAnalyzeDownloadedDataset,
+  ]);
 
   // ── Literature ──
   const handleLiteratureResearch = useCallback(async () => {
@@ -294,12 +309,13 @@ export default function App() {
       <section className="workspace-header">
         <div>
           <p className="eyebrow">Interactive astronomy workspace</p>
-          <h1>{page === "lightcurves" ? "Light Curve Lab" : "Target Info Search"}</h1>
+          <h1>{PAGE_TITLES[page]}</h1>
         </div>
-        <div className="page-switcher">
+        <nav className="page-switcher" aria-label="工作区导航">
           <button
             type="button"
             className={page === "target" ? "nav-button active" : "nav-button"}
+            aria-current={page === "target" ? "page" : undefined}
             onClick={() => setPage("target")}
           >
             目标信息
@@ -307,6 +323,7 @@ export default function App() {
           <button
             type="button"
             className={page === "lightcurves" ? "nav-button active" : "nav-button"}
+            aria-current={page === "lightcurves" ? "page" : undefined}
             onClick={() => setPage("lightcurves")}
           >
             光变曲线
@@ -314,11 +331,12 @@ export default function App() {
           <button
             type="button"
             className={page === "data" ? "nav-button active" : "nav-button"}
+            aria-current={page === "data" ? "page" : undefined}
             onClick={() => setPage("data")}
           >
             数据管理
           </button>
-        </div>
+        </nav>
       </section>
 
       {page === "target" && (
@@ -344,71 +362,75 @@ export default function App() {
         />
       )}
       {page === "lightcurves" && (
-        <LightCurvePage
-          // State
-          targetName={lc.targetName}
-          targetResult={lc.targetResult}
-          targetBusy={lc.targetBusy}
-          archiveProducts={lc.archiveProducts}
-          selectedProducts={lc.selectedProducts}
-          archiveBusy={lc.archiveBusy}
-          downloadResult={lc.downloadResult}
-          forceDownload={lc.forceDownload}
-          forceSearchRefresh={lc.forceSearchRefresh}
-          cacheStats={lc.cacheStats}
-          cacheBusy={lc.cacheBusy}
-          cacheMessage={lc.cacheMessage}
-          datasets={lc.datasets}
-          selectedDatasetDir={lc.selectedDatasetDir}
-          datasetBusy={lc.datasetBusy}
-          minPeriod={lc.minPeriod}
-          maxPeriod={lc.maxPeriod}
-          samplesPerPeak={lc.samplesPerPeak}
-          polynomialOrder={lc.polynomialOrder}
-          gapThreshold={lc.gapThreshold}
-          phasePeriodMode={lc.phasePeriodMode}
-          phasePeriod={lc.phasePeriod}
-          analysis={lc.analysis}
-          points={lc.points}
-          error={lc.error}
-          progressSteps={lc.progressSteps}
-          // Derived
-          curve={lc.curve}
-          periodOptions={lc.periodOptions}
-          selectedPhasePeriod={lc.selectedPhasePeriod}
-          phaseCurve={lc.phaseCurve}
-          phaseBinned={lc.phaseBinned}
-          hasTargetCoordinates={lc.hasTargetCoordinates}
-          selectedDataset={lc.selectedDataset}
-          targetDisplayName={lc.targetDisplayName}
-          // Actions
-          setTargetName={lc.setTargetName}
-          setMinPeriod={lc.setMinPeriod}
-          setMaxPeriod={lc.setMaxPeriod}
-          setSamplesPerPeak={lc.setSamplesPerPeak}
-          setPolynomialOrder={lc.setPolynomialOrder}
-          setGapThreshold={lc.setGapThreshold}
-          setPhasePeriodMode={lc.setPhasePeriodMode}
-          setPhasePeriod={lc.setPhasePeriod}
-          setSelectedDatasetDir={lc.setSelectedDatasetDir}
-          setForceDownload={lc.setForceDownload}
-          setForceSearchRefresh={lc.setForceSearchRefresh}
-          toggleProduct={lc.toggleProduct}
-          handleSpectrumClick={lc.handleSpectrumClick}
-          handleAnalyze={lc.handleAnalyze}
-          handleAnalyzeDownloadedDataset={lc.handleAnalyzeDownloadedDataset}
-          handleRunPeriodSearch={lc.handleRunPeriodSearch}
-          handleFile={lc.handleFile}
-          handleTargetQuery={handleTargetQuery}
-          handleArchiveSearch={handleArchiveSearch}
-          handleArchiveDownload={handleArchiveDownload}
-          handleCacheVerify={handleCacheVerify}
-          handleCacheCleanup={handleCacheCleanup}
-          handleDeleteDataset={handleDeleteDataset}
-        />
+        <Suspense fallback={<div className="page-loading" role="status">正在加载光变工作区…</div>}>
+          <LightCurvePage
+            // State
+            targetName={lc.targetName}
+            targetResult={lc.targetResult}
+            targetBusy={lc.targetBusy}
+            archiveProducts={lc.archiveProducts}
+            selectedProducts={lc.selectedProducts}
+            archiveBusy={lc.archiveBusy}
+            downloadResult={lc.downloadResult}
+            forceDownload={lc.forceDownload}
+            forceSearchRefresh={lc.forceSearchRefresh}
+            cacheStats={lc.cacheStats}
+            cacheBusy={lc.cacheBusy}
+            cacheMessage={lc.cacheMessage}
+            datasets={lc.datasets}
+            selectedDatasetDir={lc.selectedDatasetDir}
+            datasetBusy={lc.datasetBusy}
+            minPeriod={lc.minPeriod}
+            maxPeriod={lc.maxPeriod}
+            samplesPerPeak={lc.samplesPerPeak}
+            polynomialOrder={lc.polynomialOrder}
+            gapThreshold={lc.gapThreshold}
+            phasePeriodMode={lc.phasePeriodMode}
+            phasePeriod={lc.phasePeriod}
+            analysis={lc.analysis}
+            points={lc.points}
+            error={lc.error}
+            progressSteps={lc.progressSteps}
+            // Derived
+            curve={lc.curve}
+            periodOptions={lc.periodOptions}
+            selectedPhasePeriod={lc.selectedPhasePeriod}
+            phaseCurve={lc.phaseCurve}
+            phaseBinned={lc.phaseBinned}
+            hasTargetCoordinates={lc.hasTargetCoordinates}
+            selectedDataset={lc.selectedDataset}
+            targetDisplayName={lc.targetDisplayName}
+            // Actions
+            setTargetName={lc.setTargetName}
+            setMinPeriod={lc.setMinPeriod}
+            setMaxPeriod={lc.setMaxPeriod}
+            setSamplesPerPeak={lc.setSamplesPerPeak}
+            setPolynomialOrder={lc.setPolynomialOrder}
+            setGapThreshold={lc.setGapThreshold}
+            setPhasePeriodMode={lc.setPhasePeriodMode}
+            setPhasePeriod={lc.setPhasePeriod}
+            setSelectedDatasetDir={lc.setSelectedDatasetDir}
+            setForceDownload={lc.setForceDownload}
+            setForceSearchRefresh={lc.setForceSearchRefresh}
+            toggleProduct={lc.toggleProduct}
+            handleSpectrumClick={lc.handleSpectrumClick}
+            handleAnalyze={lc.handleAnalyze}
+            handleAnalyzeDownloadedDataset={lc.handleAnalyzeDownloadedDataset}
+            handleRunPeriodSearch={lc.handleRunPeriodSearch}
+            handleFile={lc.handleFile}
+            handleTargetQuery={handleTargetQuery}
+            handleArchiveSearch={handleArchiveSearch}
+            handleArchiveDownload={handleArchiveDownload}
+            handleCacheVerify={handleCacheVerify}
+            handleCacheCleanup={handleCacheCleanup}
+            handleDeleteDataset={handleDeleteDataset}
+          />
+        </Suspense>
       )}
       {page === "data" && (
-        <DataManagerPage />
+        <Suspense fallback={<div className="page-loading" role="status">正在加载数据管理…</div>}>
+          <DataManagerPage />
+        </Suspense>
       )}
     </main>
   );

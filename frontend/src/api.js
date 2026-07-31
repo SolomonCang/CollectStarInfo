@@ -1,17 +1,34 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 async function request(path, options) {
+  const headers = new Headers(options?.headers);
+  if (options?.body != null && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers,
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const contentType = response.headers.get("content-type") ?? "";
+    let message = "";
+    if (contentType.includes("application/json")) {
+      const payload = await response.json().catch(() => null);
+      const detail = payload?.detail ?? payload?.message ?? payload;
+      message = typeof detail === "string" ? detail : JSON.stringify(detail);
+    } else {
+      message = await response.text();
+    }
     throw new Error(message || `Request failed: ${response.status}`);
   }
 
-  return response.json();
+  if (response.status === 204) return null;
+  const contentType = response.headers.get("content-type") ?? "";
+  return contentType.includes("application/json")
+    ? response.json()
+    : response.text();
 }
 
 export function queryTarget(payload) {
@@ -88,8 +105,8 @@ export function analyzeDownloadedLightCurve(payload) {
 
 // ── Catalog / Data Manager ─────────────────────────────────────
 
-export function getCatalogStats() {
-  return request("/api/catalog/stats");
+export function getCatalogStats(options) {
+  return request("/api/catalog/stats", options);
 }
 
 export function listCatalogEntries(payload = {}) {
@@ -122,14 +139,14 @@ export function rebuildCatalog() {
   });
 }
 
-export function listStars(params = {}) {
+export function listStars(params = {}, options) {
   const qs = new URLSearchParams();
   if (params.search) qs.set("search", params.search);
   if (params.source) qs.set("source", params.source);
   if (params.offset != null) qs.set("offset", String(params.offset));
   if (params.limit != null) qs.set("limit", String(params.limit));
   const q = qs.toString();
-  return request(`/api/catalog/stars${q ? `?${q}` : ""}`);
+  return request(`/api/catalog/stars${q ? `?${q}` : ""}`, options);
 }
 
 export function deleteStar(starName) {

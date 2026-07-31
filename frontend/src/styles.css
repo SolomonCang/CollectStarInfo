@@ -2,6 +2,18 @@
   font-family: "Avenir Next", "Gill Sans", "Noto Sans SC", sans-serif;
   color: #1c2523;
   background: #edf3ef;
+  --surface: #fbfdfb;
+  --bg-muted: #edf3ef;
+  --border: #cbd9d3;
+  --border-subtle: #e4ece8;
+  --radius: 8px;
+  --gap: 14px;
+  --fg-soft: #52635e;
+  --primary: #0f766e;
+  --primary-soft: #dff1ec;
+  --accent: #0f766e;
+  --accent-alpha: rgba(15, 118, 110, 0.12);
+  --success: #2e7d32;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -93,6 +105,15 @@ textarea {
   width: min(1440px, calc(100% - 32px));
   margin: 0 auto;
   padding: 24px 0 36px;
+}
+
+.page-loading {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  background: var(--surface);
+  color: var(--fg-soft);
+  text-align: center;
 }
 
 .workspace-header {

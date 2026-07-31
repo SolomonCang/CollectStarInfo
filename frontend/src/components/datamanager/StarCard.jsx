@@ -81,6 +81,7 @@ export default function StarCard({
         <input
           type="checkbox"
           className="dm-star-checkbox"
+          aria-label={`选择 ${name}`}
           checked={selected}
           onChange={(e) => {
             e.stopPropagation();
@@ -90,7 +91,16 @@ export default function StarCard({
           disabled={busy}
         />
 
-        <button type="button" className="dm-expand-btn" aria-label={expanded ? "收起" : "展开"}>
+        <button
+          type="button"
+          className="dm-expand-btn"
+          aria-label={expanded ? `收起 ${name}` : `展开 ${name}`}
+          aria-expanded={expanded}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleExpand(normalized);
+          }}
+        >
           {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
         </button>
 

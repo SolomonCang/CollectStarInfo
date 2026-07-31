@@ -46,9 +46,6 @@ const initialState = {
   // UI
   error: "",
   progressSteps: [],
-
-  // Periodogram zoom (brush)
-  periodogramDomain: null, // [freqMin, freqMax] or null for auto
 };
 
 // ── Reducer ──────────────────────────────────────────────────────
@@ -169,12 +166,6 @@ function reducer(state, action) {
     case "SET_PROGRESS_STEPS":
       return { ...state, progressSteps: action.payload };
 
-    case "SET_PERIODOGRAM_DOMAIN":
-      return { ...state, periodogramDomain: action.payload };
-
-    case "RESET_ZOOM":
-      return { ...state, periodogramDomain: null };
-
     default:
       return state;
   }
@@ -253,14 +244,6 @@ export function useLightCurveState() {
     return t?.resolved_target || t?.query_target || state.targetName;
   }, [state.targetResult, state.targetName]);
 
-  // ── Filtered periodogram for zoom ──
-  const filteredPeriodogram = useMemo(() => {
-    const raw = state.analysis?.period_search?.periodogram ?? [];
-    if (!state.periodogramDomain || !raw.length) return raw;
-    const [fMin, fMax] = state.periodogramDomain;
-    return raw.filter((p) => p.frequency >= fMin && p.frequency <= fMax);
-  }, [state.analysis, state.periodogramDomain]);
-
   // ── Actions ──
   const setTargetName = useCallback((val) => dispatch({ type: "SET_TARGET_NAME", payload: val }), []);
   const setMinPeriod = useCallback((val) => dispatch({ type: "SET_MIN_PERIOD", payload: val }), []);
@@ -274,8 +257,6 @@ export function useLightCurveState() {
   const setForceDownload = useCallback((val) => dispatch({ type: "SET_FORCE_DOWNLOAD", payload: val }), []);
   const setForceSearchRefresh = useCallback((val) => dispatch({ type: "SET_FORCE_SEARCH_REFRESH", payload: val }), []);
   const setError = useCallback((val) => dispatch({ type: "SET_ERROR", payload: val }), []);
-  const setPeriodogramDomain = useCallback((val) => dispatch({ type: "SET_PERIODOGRAM_DOMAIN", payload: val }), []);
-  const resetZoom = useCallback(() => dispatch({ type: "RESET_ZOOM" }), []);
 
   const setProgressSteps = useCallback((steps) => {
     dispatch({ type: "SET_PROGRESS_STEPS", payload: steps });
@@ -374,7 +355,6 @@ export function useLightCurveState() {
     hasTargetCoordinates,
     selectedDataset,
     targetDisplayName,
-    filteredPeriodogram,
     // Actions
     setTargetName,
     setMinPeriod,
@@ -390,8 +370,6 @@ export function useLightCurveState() {
     setError,
     setPoints,
     setProgressSteps,
-    setPeriodogramDomain,
-    resetZoom,
     toggleProduct,
     handleSpectrumClick,
     handleAnalyze,

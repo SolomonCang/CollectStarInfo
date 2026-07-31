@@ -7,6 +7,7 @@ export default function DataFilter({
   return (
     <div className="dm-filter-bar">
       <select
+        aria-label="按数据来源筛选"
         value={source}
         onChange={(e) => onFilterChange({ source: e.target.value })}
         disabled={busy}
@@ -19,6 +20,7 @@ export default function DataFilter({
       </select>
 
       <input
+        aria-label="搜索星名或来源"
         type="text"
         placeholder="搜索星名、来源..."
         value={search}

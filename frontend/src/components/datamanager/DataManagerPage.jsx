@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Database, HardDrive, RefreshCw, Trash2, Star } from "lucide-react";
 import { useDataManagerState } from "../../hooks/useDataManagerState";
 import {
@@ -15,44 +15,44 @@ import StarCard from "./StarCard";
 export default function DataManagerPage() {
   const dm = useDataManagerState();
   const [deletingStar, setDeletingStar] = useState(null);
+  const listControllerRef = useRef(null);
 
   // ── Load ──
-  const loadStats = useCallback(async () => {
-    try {
-      const stats = await getCatalogStats();
-      dm.dispatch({ type: "SET_STATS", payload: stats });
-    } catch (e) {
-      dm.dispatch({ type: "SET_ERROR", payload: e.message });
-    }
-  }, [dm.dispatch]);
-
   const loadStars = useCallback(async () => {
+    listControllerRef.current?.abort();
+    const controller = new AbortController();
+    listControllerRef.current = controller;
     dm.dispatch({ type: "SET_BUSY" });
     try {
-      const result = await listStars({
-        search: dm.search || null,
-        source: dm.source || null,
-        offset: dm.offset,
-        limit: dm.limit,
-      });
+      const [result, stats] = await Promise.all([
+        listStars({
+          search: dm.search || null,
+          source: dm.source || null,
+          offset: dm.offset,
+          limit: dm.limit,
+        }, { signal: controller.signal }),
+        getCatalogStats({ signal: controller.signal }),
+      ]);
       dm.dispatch({ type: "SET_STARS", payload: result });
-      await loadStats();
+      dm.dispatch({ type: "SET_STATS", payload: stats });
     } catch (e) {
+      if (e.name === "AbortError") return;
       dm.dispatch({ type: "SET_ERROR", payload: e.message });
+    } finally {
+      if (listControllerRef.current === controller) {
+        listControllerRef.current = null;
+      }
     }
-  }, [dm.search, dm.source, dm.offset, dm.limit, dm.dispatch, loadStats]);
+  }, [dm.search, dm.source, dm.offset, dm.limit, dm.dispatch]);
 
+  // Use one cancellable loading path so fast filter changes cannot apply stale data.
   useEffect(() => {
-    loadStars();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dm.source, dm.offset, dm.limit]);
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => loadStars(), 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dm.search]);
+    const timer = setTimeout(loadStars, dm.search ? 300 : 0);
+    return () => {
+      clearTimeout(timer);
+      listControllerRef.current?.abort();
+    };
+  }, [dm.search, loadStars]);
 
   // ── Actions ──
   const handleBatchDelete = useCallback(async () => {
@@ -66,51 +66,48 @@ export default function DataManagerPage() {
         const result = await deleteStar(starName);
         totalRemovedMb += result.removed_mb || 0;
       }
+      await loadStars();
       dm.dispatch({
         type: "SET_MESSAGE",
         payload: `已删除，释放 ${totalRemovedMb.toFixed(2)} MB。`,
       });
-      await loadStars();
-      await loadStats();
     } catch (e) {
       dm.dispatch({ type: "SET_ERROR", payload: e.message });
     } finally {
       setDeletingStar(null);
     }
-  }, [dm.selectedStars, dm.dispatch, loadStars, loadStats]);
+  }, [dm.selectedStars, dm.dispatch, loadStars]);
 
   const handleDeleteSingle = useCallback(async (starName) => {
     dm.dispatch({ type: "SET_BUSY" });
     setDeletingStar(starName);
     try {
       const result = await deleteStar(starName);
+      await loadStars();
       dm.dispatch({
         type: "SET_MESSAGE",
         payload: `已删除「${starName}」，释放 ${result.removed_mb} MB。`,
       });
-      await loadStars();
-      await loadStats();
     } catch (e) {
       dm.dispatch({ type: "SET_ERROR", payload: e.message });
     } finally {
       setDeletingStar(null);
     }
-  }, [dm.dispatch, loadStars, loadStats]);
+  }, [dm.dispatch, loadStars]);
 
   const handleRebuild = useCallback(async () => {
     dm.dispatch({ type: "SET_BUSY" });
     try {
       const result = await rebuildCatalog();
+      await loadStars();
       dm.dispatch({
         type: "SET_MESSAGE",
         payload: `目录已重建：${result.total_entries} 个条目。`,
       });
-      await loadStars();
-      await loadStats();
     } catch (e) {
       dm.dispatch({ type: "SET_ERROR", payload: e.message });
     }
-  }, [dm.dispatch, loadStars, loadStats]);
+  }, [dm.dispatch, loadStars]);
 
   // ── Pagination ──
   const totalPages = Math.max(1, Math.ceil(dm.total / dm.limit));
@@ -170,7 +167,7 @@ export default function DataManagerPage() {
         </div>
       </div>
 
-      {dm.message ? <div className="dm-message">{dm.message}</div> : null}
+      {dm.message ? <div className="dm-message" role="status">{dm.message}</div> : null}
 
       {/* ── Star list ── */}
       <div className="dm-star-list">
@@ -217,6 +214,7 @@ export default function DataManagerPage() {
             下一页
           </button>
           <select
+            aria-label="每页显示数量"
             value={dm.limit}
             onChange={(e) => dm.setLimit(Number(e.target.value))}
             disabled={dm.busy}
