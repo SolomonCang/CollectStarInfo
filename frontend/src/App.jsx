@@ -46,7 +46,7 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <section className="workspace-header">
+      <section className={page === "lightcurves" ? "workspace-header compact-header" : "workspace-header"}>
         <div>
           <p className="eyebrow">Interactive astronomy workspace</p>
           <h1>{PAGE_TITLES[page]}</h1>
