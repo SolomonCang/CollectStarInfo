@@ -70,7 +70,7 @@ function Sidebar({ user, stars, page, onPage, onTarget, open, onClose, onLogout 
         {visibleStars.map((item) => <button key={item.normalized} onClick={() => { onTarget(item.name); go("home"); }}><span className="target-avatar">{item.name.slice(0, 1).toUpperCase()}</span><span><strong>{item.name}</strong><small>{item.entry_count || 0} 条数据 · {item.has_lc ? "含光变" : "目标信息"}</small></span></button>)}
         {!visibleStars.length ? <small className="sidebar-empty">迁移或查询目标后显示在这里</small> : null}
       </div>
-      <div className="sidebar-account"><div className="target-avatar">{user.username.slice(0, 1).toUpperCase()}</div><span><strong>{user.username}</strong><small>{user.is_admin ? "管理员" : "普通用户"}</small></span><button title="退出登录" aria-label="退出登录" onClick={onLogout}><LogOut size={16} /></button></div>
+      <div className="sidebar-account"><div className="target-avatar">{user.username.slice(0, 1).toUpperCase()}</div><span><strong>{user.username}</strong><small>{user.is_admin ? "管理员" : "普通用户"}</small></span><button title="返回科研科普平台" aria-label="返回科研科普平台" onClick={onLogout}><LogOut size={16} /></button></div>
     </aside>
   );
 }
@@ -134,5 +134,5 @@ export default function App() {
   if (auth.loading && !auth.user) return <LoadingScreen label="正在验证会话…" />;
   if (!auth.user) return <LoginPage busy={auth.loading} error={auth.error} onLogin={auth.login} />;
   if (auth.user.must_change_password) return <ChangePasswordPage busy={passwordBusy} error={passwordError || auth.error} onLogout={auth.logout} onChange={async (payload) => { setPasswordBusy(true); setPasswordError(""); try { await auth.changePassword(payload); } catch (caught) { setPasswordError(caught.message); } finally { setPasswordBusy(false); } }} />;
-  return <WorkspaceApp user={auth.user} onLogout={auth.logout} />;
+  return <WorkspaceApp user={auth.user} onLogout={() => window.location.assign("/")} />;
 }
