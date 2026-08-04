@@ -21,8 +21,9 @@ COPY targets_input.txt ./targets_input.txt
 # 复制前端预构建产物 (先在宿主机执行: cd frontend && npm run build)
 COPY frontend/dist/ ./frontend/dist/
 
-# 创建输出目录
-RUN mkdir -p results data/lightcurves warehouse/db warehouse/objects/lightcurves warehouse/cache warehouse/secrets
+# 创建输出目录并授予容器运行用户写权限
+RUN mkdir -p results data/lightcurves warehouse/db warehouse/objects/lightcurves warehouse/cache warehouse/secrets \
+    && chown -R 1005:1005 /app
 
 EXPOSE 8000
 

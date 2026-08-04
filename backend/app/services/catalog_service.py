@@ -48,9 +48,9 @@ def _normalize_star_name(name: str) -> str:
 def _resolve_catalog_path(value: str) -> Path:
     candidate = Path(value)
     resolved = (candidate if candidate.is_absolute() else PROJECT_ROOT / candidate).resolve()
-    root = WAREHOUSE_ROOT.resolve()
-    if resolved != root and root not in resolved.parents:
-        raise HTTPException(status_code=400, detail="目录条目路径不在 warehouse 内")
+    allowed_roots = [WAREHOUSE_ROOT.resolve(), PROJECT_ROOT.resolve()]
+    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+        raise HTTPException(status_code=400, detail="目录条目路径不在允许的共享数据根目录内")
     return resolved
 
 
@@ -114,14 +114,25 @@ def _file_hash(path: str) -> str:
     return hashlib.sha256(path.encode()).hexdigest()[:16]
 
 
+def _iter_lightcurve_roots() -> list[Path]:
+    roots: list[Path] = []
+    for root in (DATA_ROOT, PROJECT_ROOT / "data" / "lightcurves"):
+        if not root:
+            continue
+        resolved = root.resolve()
+        if resolved not in roots:
+            roots.append(resolved)
+    return roots
+
+
 def _find_manifest_for_file(file_path: Path) -> dict[str, Any]:
     """Walk up from file_path to find the nearest manifest.json."""
     current = file_path.parent
-    for _ in range(5):
+    for _ in range(10):
         manifest = read_json(current / "manifest.json")
         if isinstance(manifest, dict):
             return manifest
-        if current.parent == current or current == DATA_ROOT:
+        if current.parent == current or any(current == root for root in _iter_lightcurve_roots()):
             break
         current = current.parent
     return {}
@@ -184,131 +195,159 @@ def _read_fits_metadata(fits_path: Path) -> dict[str, Any]:
 def _scan_lightcurve_files() -> Iterator[dict[str, Any]]:
     """Yield one catalog entry per unique lightcurve FITS or derived CSV file.
 
-    Scans ``data/lightcurves/<Star>/`` directories, deduplicates by inode
-    (so hard-linked files from the product cache are counted once), and
-    produces file-level entries similar to how MAST presents individual
-    observations.
+    Scans the shared lightcurve roots (warehouse objects and legacy data/lightcurves),
+    deduplicates by inode, and produces file-level entries similar to how MAST presents
+    individual observations.
     """
-    if not DATA_ROOT.exists():
+    roots = [root for root in _iter_lightcurve_roots() if root.exists()]
+    if not roots:
         return
 
     seen_inodes: set[tuple[int, int]] = set()
 
-    for star_dir in sorted(DATA_ROOT.iterdir()):
-        if not star_dir.is_dir():
+    for root in roots:
+        if not root.exists():
             continue
-        if star_dir.name.startswith(".") or star_dir.name.startswith("_"):
-            continue
-
-        star_name = star_dir.name
-
-        # ── FITS files ──
-        fits_paths: list[Path] = []
-        for pattern in ("*.fits", "*.fits.gz"):
-            fits_paths.extend(star_dir.rglob(pattern))
-
-        for fits_path in sorted(fits_paths):
-            if not fits_path.is_file():
+        for star_dir in sorted(root.iterdir()):
+            if not star_dir.is_dir():
                 continue
-            try:
-                stat = fits_path.stat()
-                inode_key = (stat.st_dev, stat.st_ino)
-                if inode_key in seen_inodes:
-                    continue  # hardlink duplicate
-                seen_inodes.add(inode_key)
-            except OSError:
+            if star_dir.name.startswith(".") or star_dir.name.startswith("_"):
                 continue
 
-            manifest = _find_manifest_for_file(fits_path)
-            mission = _guess_mission_from_path(fits_path)
-            fits_meta = _read_fits_metadata(fits_path)
+            star_name = star_dir.name
 
-            rel_path = str(fits_path.relative_to(PROJECT_ROOT))
+            # ── FITS files ──
+            fits_paths: list[Path] = []
+            for pattern in ("*.fits", "*.fits.gz"):
+                fits_paths.extend(star_dir.rglob(pattern))
 
-            yield {
-                "id": f"fits_{_file_hash(rel_path)}",
-                "type": "lightcurve_file",
-                "display_name": star_name,
-                "source": f"MAST/{mission}" if mission else "MAST",
-                "file_path": rel_path,
-                "size_bytes": stat.st_size,
-                "created_at": datetime.fromtimestamp(
-                    stat.st_mtime, tz=timezone.utc).isoformat(),
-                "tags": ["lightcurve"]
-                + ([mission.lower()] if mission else []),
-                "valid": fits_meta["point_count"] > 0,
-                "metadata": {
-                    "missions": [mission] if mission else [],
-                    "point_count": fits_meta["point_count"],
-                    "time_span_days": fits_meta["time_span_days"],
-                    "filename": fits_path.name,
-                    "obs_id": fits_meta.get("obs_id", ""),
-                    "file_type": "fits",
-                },
-            }
-
-        # ── Derived CSV files ──
-        csv_paths: list[Path] = list(star_dir.rglob("lightcurve.csv"))
-        for csv_path in sorted(csv_paths):
-            if not csv_path.is_file():
-                continue
-            try:
-                stat = csv_path.stat()
-                inode_key = (stat.st_dev, stat.st_ino)
-                if inode_key in seen_inodes:
+            for fits_path in sorted(fits_paths):
+                if not fits_path.is_file():
                     continue
-                seen_inodes.add(inode_key)
-            except OSError:
-                continue
+                try:
+                    stat = fits_path.stat()
+                    inode_key = (stat.st_dev, stat.st_ino)
+                    if inode_key in seen_inodes:
+                        continue  # hardlink duplicate
+                    seen_inodes.add(inode_key)
+                except OSError:
+                    continue
 
-            manifest = _find_manifest_for_file(csv_path)
-            missions: list[str] = manifest.get("missions", [])
+                manifest = _find_manifest_for_file(fits_path)
+                mission = _guess_mission_from_path(fits_path)
+                fits_meta = _read_fits_metadata(fits_path)
 
-            point_count = 0
-            time_span_days: float | None = None
-            try:
-                times: list[float] = []
-                with csv_path.open("r", encoding="utf-8") as handle:
-                    reader = csv.DictReader(handle)
-                    for row in reader:
-                        try:
-                            t = float(row.get("time") or 0)
-                            times.append(t)
-                        except (ValueError, TypeError):
-                            continue
-                if times:
-                    point_count = len(times)
-                    time_span_days = round(max(times) - min(times), 2)
-            except Exception:
-                pass
+                rel_path = str(fits_path.relative_to(PROJECT_ROOT))
 
-            rel_path = str(csv_path.relative_to(PROJECT_ROOT))
+                yield {
+                    "id": f"fits_{_file_hash(rel_path)}",
+                    "type": "lightcurve_file",
+                    "display_name": star_name,
+                    "source": f"MAST/{mission}" if mission else "MAST",
+                    "file_path": rel_path,
+                    "size_bytes": stat.st_size,
+                    "created_at": datetime.fromtimestamp(
+                        stat.st_mtime, tz=timezone.utc).isoformat(),
+                    "tags": ["lightcurve"]
+                    + ([mission.lower()] if mission else []),
+                    "valid": fits_meta["point_count"] > 0,
+                    "metadata": {
+                        "missions": [mission] if mission else [],
+                        "point_count": fits_meta["point_count"],
+                        "time_span_days": fits_meta["time_span_days"],
+                        "filename": fits_path.name,
+                        "obs_id": fits_meta.get("obs_id", ""),
+                        "file_type": "fits",
+                    },
+                }
 
-            yield {
-                "id": f"csv_{_file_hash(rel_path)}",
-                "type": "lightcurve_derived",
-                "display_name": star_name,
-                "source": f"MAST/{'/'.join(missions)}" if missions else "MAST",
-                "file_path": rel_path,
-                "size_bytes": stat.st_size,
-                "created_at": datetime.fromtimestamp(
-                    stat.st_mtime, tz=timezone.utc).isoformat(),
-                "tags": ["lightcurve", "derived"]
-                + [m.lower() for m in missions],
-                "valid": True,
-                "metadata": {
-                    "missions": missions,
-                    "point_count": point_count,
-                    "time_span_days": time_span_days,
-                    "filename": csv_path.name,
-                    "file_type": "csv",
-                },
-            }
+            # ── Derived CSV files ──
+            csv_paths: list[Path] = list(star_dir.rglob("lightcurve.csv"))
+            for csv_path in sorted(csv_paths):
+                if not csv_path.is_file():
+                    continue
+                try:
+                    stat = csv_path.stat()
+                    inode_key = (stat.st_dev, stat.st_ino)
+                    if inode_key in seen_inodes:
+                        continue
+                    seen_inodes.add(inode_key)
+                except OSError:
+                    continue
+
+                manifest = _find_manifest_for_file(csv_path)
+                missions: list[str] = manifest.get("missions", [])
+
+                point_count = 0
+                time_span_days: float | None = None
+                try:
+                    times: list[float] = []
+                    with csv_path.open("r", encoding="utf-8") as handle:
+                        reader = csv.DictReader(handle)
+                        for row in reader:
+                            try:
+                                t = float(row.get("time") or 0)
+                                times.append(t)
+                            except (ValueError, TypeError):
+                                continue
+                    if times:
+                        point_count = len(times)
+                        time_span_days = round(max(times) - min(times), 2)
+                except Exception:
+                    pass
+
+                rel_path = str(csv_path.relative_to(PROJECT_ROOT))
+
+                yield {
+                    "id": f"csv_{_file_hash(rel_path)}",
+                    "type": "lightcurve_derived",
+                    "display_name": star_name,
+                    "source": f"MAST/{'/'.join(missions)}" if missions else "MAST",
+                    "file_path": rel_path,
+                    "size_bytes": stat.st_size,
+                    "created_at": datetime.fromtimestamp(
+                        stat.st_mtime, tz=timezone.utc).isoformat(),
+                    "tags": ["lightcurve", "derived"]
+                    + [m.lower() for m in missions],
+                    "valid": True,
+                    "metadata": {
+                        "missions": missions,
+                        "point_count": point_count,
+                        "time_span_days": time_span_days,
+                        "filename": csv_path.name,
+                        "file_type": "csv",
+                    },
+                }
+
+
+def _merge_catalog_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merge relational workspace entries with existing filesystem-backed data."""
+    merged: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    def add_entry(entry: dict[str, Any]) -> None:
+        key = (
+            str(entry.get("type", "")),
+            str(entry.get("display_name", "")),
+            str(entry.get("file_path", "")),
+        )
+        if key in seen:
+            return
+        seen.add(key)
+        merged.append(entry)
+
+    for entry in entries:
+        add_entry(entry)
+    for entry in _scan_target_results():
+        add_entry(entry)
+    for entry in _scan_lightcurve_files():
+        add_entry(entry)
+    return merged
 
 
 def _rebuild_catalog() -> dict[str, Any]:
     """Export the authoritative relational catalog for legacy readers."""
-    entries = workspace.catalog_entries()
+    entries = _merge_catalog_entries(workspace.catalog_entries())
     persistence.upsert_catalog(entries)
     catalog: dict[str, Any] = {
         "version": CATALOG_VERSION,

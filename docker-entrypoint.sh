@@ -7,5 +7,7 @@ if [ -n "$DEEPSEEK_API_KEY" ]; then
     sed -i "s|api_key:.*|api_key: \"$DEEPSEEK_API_KEY\"|" /app/config.yaml
 fi
 
+mkdir -p /app/results /app/data/lightcurves /app/warehouse/db /app/warehouse/objects/lightcurves /app/warehouse/cache /app/warehouse/secrets
+
 echo "[entrypoint] Starting FastAPI on 0.0.0.0:8000"
 exec python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
