@@ -57,14 +57,14 @@ export default function DatasetSelector({
       >
         {datasetBusy ? "分析中..." : "分析选中下载数据"}
       </button>
-      <button
+      {onDelete ? <button
         type="button"
         className="danger-button"
         onClick={() => onDelete(selectedDir)}
         disabled={!selectedDir || datasetBusy || cacheBusy}
       >
         删除选中数据集
-      </button>
+      </button> : null}
       <label>
         CSV / whitespace: time flux [err]
         <input type="file" accept=".csv,.txt" onChange={onFile} />

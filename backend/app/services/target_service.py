@@ -10,6 +10,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from ..services.workspace_service import SessionIdentity, workspace
 from ..schemas import TargetQueryRequest
 from ..schemas import LiteratureResearchRequest
 from .persistence_service import persistence
@@ -33,18 +34,8 @@ class TargetSearchService:
     def __init__(self) -> None:
         self._settings = load_settings()
 
-    def _build_agent(self, use_llm: bool) -> Any:
+    def _build_agent(self) -> Any:
         from astro_agent.agent import TargetInfoAgent
-        from astro_agent.clients.deepseek_client import DeepSeekClient
-
-        deepseek_client = None
-        if use_llm and self._settings.deepseek_api_key:
-            deepseek_client = DeepSeekClient(
-                api_key=self._settings.deepseek_api_key,
-                base_url=self._settings.deepseek_base_url,
-                model=self._settings.deepseek_model,
-                timeout_sec=self._settings.timeout_sec,
-            )
 
         return TargetInfoAgent(
             gaia_cone_radius_arcsec=self._settings.
@@ -54,7 +45,7 @@ class TargetSearchService:
             default_simbad_reference_time_range,
             literature_min_obj_freq=self._settings.
             default_literature_min_obj_freq,
-            deepseek_client=deepseek_client,
+            deepseek_client=None,
         )
 
     def _candidate_result_paths(self, target: str) -> list[Path]:
@@ -70,6 +61,9 @@ class TargetSearchService:
         return paths
 
     def _load_existing_result(self, target: str) -> dict | None:
+        stored = workspace.load_target(target)
+        if stored is not None:
+            return stored
         remote = persistence.load_target(target)
         if remote is not None:
             remote["source"] = "postgres-s3"
@@ -89,14 +83,11 @@ class TargetSearchService:
         return None
 
     def _write_result(self, target: str, payload: dict) -> str:
-        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-        path = RESULTS_DIR / f"{safe_target_filename(target)}.json"
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
-                        encoding="utf-8")
-        remote_path = persistence.save_target(target, payload)
+        path = workspace.save_target(target, payload, source=payload.get("source", "fresh"))
+        persistence.save_target(target, payload)
         # Trigger a catalog rebuild so the new entry is visible immediately
         self._sync_catalog()
-        return remote_path or str(path.relative_to(PROJECT_ROOT))
+        return path
 
     def _sync_catalog(self) -> None:
         """Rebuild the unified catalog after writing new data."""
@@ -106,53 +97,180 @@ class TargetSearchService:
         except Exception:
             pass  # catalog sync is best-effort; never fail the main request
 
-    async def query_target(self, request: TargetQueryRequest) -> dict:
+    def _user_client(self, identity: SessionIdentity, profile_id: str | None) -> tuple[Any, dict[str, Any]]:
+        try:
+            profile = workspace.get_profile_secret(identity.user_id, profile_id)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="尚未配置可用的大模型接口，请先前往插件中心添加配置。",
+            ) from exc
+        from astro_agent.clients.openai_compatible_client import OpenAICompatibleClient
+
+        return OpenAICompatibleClient(
+            api_key=profile["api_key"], base_url=profile["base_url"],
+            model=profile["model"], timeout_sec=profile["timeout_sec"],
+        ), profile
+
+    @staticmethod
+    def _safe_llm_error(error: Exception, profile: dict[str, Any]) -> str:
+        message = str(error)
+        secret = str(profile.get("api_key") or "")
+        return message.replace(secret, "[REDACTED]") if secret else message
+
+    @staticmethod
+    def _summary_arguments(target: dict[str, Any]) -> tuple[Any, ...]:
+        from astro_agent.models import (
+            GaiaRecord, LiteratureCategorySummary, LiteratureWorkflow,
+            MastRecord, PlanetRecord, SimbadRecord,
+        )
+
+        def construct(cls: Any, value: Any) -> Any:
+            if not isinstance(value, dict):
+                return None
+            allowed = cls.__dataclass_fields__.keys()
+            return cls(**{key: item for key, item in value.items() if key in allowed})
+
+        workflow_data = target.get("literature_workflow")
+        workflow = None
+        if isinstance(workflow_data, dict):
+            workflow_values = dict(workflow_data)
+            workflow_values["observations"] = [
+                construct(LiteratureCategorySummary, item)
+                for item in workflow_values.get("observations", []) if isinstance(item, dict)
+            ]
+            workflow_values["research_topics"] = [
+                construct(LiteratureCategorySummary, item)
+                for item in workflow_values.get("research_topics", []) if isinstance(item, dict)
+            ]
+            workflow = construct(LiteratureWorkflow, workflow_values)
+        simbad = construct(SimbadRecord, target.get("simbad"))
+        references = target.get("literature_references") or (
+            simbad.references if simbad is not None else []
+        )
+        return (
+            target.get("resolved_target") or target.get("query_target") or "unknown",
+            target.get("target_type") or "unknown",
+            simbad,
+            construct(GaiaRecord, target.get("gaia")),
+            construct(MastRecord, target.get("mast")),
+            construct(PlanetRecord, target.get("planet")),
+            references,
+            workflow,
+        )
+
+    async def _add_private_summary(
+        self, payload: dict[str, Any], request: TargetQueryRequest,
+        identity: SessionIdentity,
+    ) -> dict[str, Any]:
+        target = payload.get("target") or {}
+        try:
+            client, profile = self._user_client(identity, request.llm_profile_id)
+        except HTTPException as exc:
+            payload["llm_error"] = exc.detail
+            return payload
+        target_name = target.get("resolved_target") or target.get("query_target") or request.target
+        run_id = workspace.start_llm_run(
+            identity.user_id, target_name, "target_summary", profile,
+            {
+                "target": request.target,
+                "source": payload.get("source"),
+                "target_snapshot": target,
+            },
+        )
+        try:
+            summary = await asyncio.to_thread(client.summarize, *self._summary_arguments(target))
+            target["summary"] = summary
+            run = workspace.finish_llm_run(
+                identity.user_id, run_id,
+                {"summary": summary, "target": target_name},
+            )
+            payload["llm_run_id"] = run_id
+            payload["llm_profile"] = run["profile"]
+        except Exception as exc:
+            error = self._safe_llm_error(exc, profile)
+            workspace.finish_llm_run(identity.user_id, run_id, error=error)
+            payload["llm_run_id"] = run_id
+            payload["llm_error"] = f"大模型总结失败：{error}"
+        return payload
+
+    @staticmethod
+    def _overlay_latest_private_summary(
+        payload: dict[str, Any], identity: SessionIdentity,
+    ) -> dict[str, Any]:
+        target = payload.get("target") or {}
+        target_name = target.get("resolved_target") or target.get("query_target")
+        if not target_name:
+            return payload
+        runs = workspace.list_llm_runs(
+            identity.user_id,
+            target_name=str(target_name),
+            task_type="target_summary",
+            limit=20,
+        )
+        for item in runs:
+            if item.get("status") != "complete":
+                continue
+            detail = workspace.get_llm_run(identity.user_id, item["id"])
+            result = detail.get("result") or {}
+            if result.get("summary"):
+                target["summary"] = result["summary"]
+                payload["llm_run_id"] = item["id"]
+                payload["llm_profile"] = item.get("profile")
+                break
+        return payload
+
+    async def query_target(
+        self, request: TargetQueryRequest, identity: SessionIdentity,
+    ) -> dict:
         target = request.target.strip()
         if not request.force_refresh:
             existing = self._load_existing_result(target)
             if existing is not None:
-                return existing
+                payload = json.loads(json.dumps(existing, ensure_ascii=False))
+                if isinstance(payload.get("target"), dict):
+                    payload["target"]["summary"] = None
+                if request.use_llm:
+                    return await self._add_private_summary(payload, request, identity)
+                return self._overlay_latest_private_summary(payload, identity)
 
-        agent = self._build_agent(use_llm=request.use_llm)
-        result = await asyncio.to_thread(agent.run_target, target,
-                                         request.use_llm)
+        agent = self._build_agent()
+        result = await asyncio.to_thread(agent.run_target, target, False)
         payload = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "target": result.to_dict(),
             "source": "fresh",
         }
         payload["result_path"] = self._write_result(target, payload)
-        return payload
+        if request.use_llm:
+            return await self._add_private_summary(payload, request, identity)
+        return self._overlay_latest_private_summary(payload, identity)
 
-    async def research_literature(self,
-                                  request: LiteratureResearchRequest) -> dict:
-        if not self._settings.deepseek_api_key:
-            raise HTTPException(
-                status_code=400,
-                detail=
-                "DeepSeek API key is not configured. Put it in DSAPI.key.",
+    async def research_literature(
+        self, request: LiteratureResearchRequest, identity: SessionIdentity,
+    ) -> dict:
+        client, profile = self._user_client(identity, request.llm_profile_id)
+        run_id = workspace.start_llm_run(
+            identity.user_id, request.target.strip(), "literature_research", profile,
+            request.model_dump(),
+        )
+        try:
+            research_result = await asyncio.to_thread(
+                client.research_literature,
+                request.target.strip(), request.target_type, request.references,
+                request.literature_workflow, request.focus_question,
+                request.prescreen_keywords,
             )
-
-        from astro_agent.clients.deepseek_client import DeepSeekClient
-
-        client = DeepSeekClient(
-            api_key=self._settings.deepseek_api_key,
-            base_url=self._settings.deepseek_base_url,
-            model=self._settings.deepseek_model,
-            timeout_sec=self._settings.timeout_sec,
-        )
-        research_result = await asyncio.to_thread(
-            client.research_literature,
-            request.target.strip(),
-            request.target_type,
-            request.references,
-            request.literature_workflow,
-            request.focus_question,
-            request.prescreen_keywords,
-        )
-        return {
+        except Exception as exc:
+            error = self._safe_llm_error(exc, profile)
+            workspace.finish_llm_run(identity.user_id, run_id, error=error)
+            raise HTTPException(status_code=502, detail=f"大模型文献调研失败：{error}") from exc
+        response = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "target": request.target.strip(),
             "reference_count": len(request.references),
+            "llm_run_id": run_id,
             **research_result,
         }
+        workspace.finish_llm_run(identity.user_id, run_id, response)
+        return response

@@ -20,7 +20,7 @@ import PeriodogramChart from "./PeriodogramChart";
 import PhaseFoldedChart from "./PhaseFoldedChart";
 import PeriodMetrics from "./PeriodMetrics";
 
-export default function LightCurvePage({ workspace }) {
+export default function LightCurvePage({ workspace, canManage = false }) {
   const [dataPanelOpen, setDataPanelOpen] = useState(false);
   const {
     // State
@@ -173,7 +173,7 @@ export default function LightCurvePage({ workspace }) {
               onForceDownloadChange={setForceDownload}
               onForceSearchRefreshChange={setForceSearchRefresh}
               onCacheVerify={handleCacheVerify}
-              onCacheCleanup={handleCacheCleanup}
+              onCacheCleanup={canManage ? handleCacheCleanup : null}
             />
 
             <DatasetSelector
@@ -184,7 +184,7 @@ export default function LightCurvePage({ workspace }) {
               onFile={handleFile}
               datasetBusy={datasetBusy}
               cacheBusy={cacheBusy}
-              onDelete={handleDeleteDataset}
+              onDelete={canManage ? handleDeleteDataset : null}
             />
           </div>
         </section>

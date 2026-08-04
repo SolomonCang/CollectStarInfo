@@ -7,6 +7,7 @@ class TargetQueryRequest(BaseModel):
     target: str = Field(min_length=1, description="Target name or coordinates")
     use_llm: bool = False
     force_refresh: bool = False
+    llm_profile_id: str | None = None
 
 
 class LiteratureResearchRequest(BaseModel):
@@ -16,6 +17,40 @@ class LiteratureResearchRequest(BaseModel):
     literature_workflow: dict | None = None
     focus_question: str | None = None
     prescreen_keywords: bool = True
+    llm_profile_id: str | None = None
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=1, max_length=512)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=512)
+    new_password: str = Field(min_length=10, max_length=512)
+
+
+class AdminUserCreateRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=128)
+    password: str | None = Field(default=None, min_length=10, max_length=512)
+    role: str = Field(default="user", pattern="^(user|admin)$")
+    must_change_password: bool = True
+
+
+class AdminUserUpdateRequest(BaseModel):
+    is_active: bool | None = None
+    reset_password: bool = False
+
+
+class LlmProfileRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    provider: str = Field(default="custom", pattern="^(deepseek|openai|custom)$")
+    base_url: str = Field(min_length=1, max_length=2048)
+    model: str = Field(min_length=1, max_length=256)
+    api_key: str | None = Field(default=None, max_length=4096)
+    timeout_sec: int = Field(default=45, ge=5, le=300)
+    is_default: bool = False
+    is_enabled: bool = True
 
 
 class LightCurveArchiveSearchRequest(BaseModel):

@@ -13,10 +13,15 @@ from typing import Any, Iterator
 
 from fastapi import HTTPException
 
+from .workspace_service import (
+    CACHE_ROOT as WAREHOUSE_CACHE_ROOT,
+    LIGHTCURVE_OBJECT_ROOT,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DATA_ROOT = PROJECT_ROOT / "data" / "lightcurves"
-CACHE_ROOT = DATA_ROOT / "_cache"
-SEARCH_CACHE_ROOT = CACHE_ROOT / "search"
+CACHE_ROOT = WAREHOUSE_CACHE_ROOT
+DATA_ROOT = LIGHTCURVE_OBJECT_ROOT
+SEARCH_CACHE_ROOT = CACHE_ROOT / "mast-search"
 PRODUCT_CACHE_ROOT = CACHE_ROOT / "products"
 DERIVED_CACHE_ROOT = CACHE_ROOT / "derived"
 ANALYSIS_CACHE_ROOT = CACHE_ROOT / "analysis"
@@ -90,7 +95,7 @@ def resolve_data_path(download_dir: str) -> Path:
     if resolved != data_root and data_root not in resolved.parents:
         raise HTTPException(
             status_code=400,
-            detail="download_dir must be under data/lightcurves")
+            detail="download_dir must be under warehouse/objects/lightcurves")
     if not resolved.exists() or not resolved.is_dir():
         from .persistence_service import persistence
 

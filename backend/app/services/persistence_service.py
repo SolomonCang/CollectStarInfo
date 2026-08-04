@@ -46,7 +46,7 @@ class PersistenceSettings:
 
     @classmethod
     def from_env(cls) -> "PersistenceSettings":
-        backend = os.getenv("PERSISTENCE_BACKEND", "filesystem").strip().lower()
+        backend = os.getenv("PERSISTENCE_BACKEND", "sqlite-warehouse").strip().lower()
         return cls(
             backend=backend,
             database_url=os.getenv("DATABASE_URL", ""),
@@ -391,10 +391,15 @@ class PersistenceService:
         if row is None:
             return None
         destination = (PROJECT_ROOT / download_dir).resolve()
-        allowed_root = (PROJECT_ROOT / "data" / "lightcurves").resolve()
-        if destination != allowed_root and allowed_root not in destination.parents:
+        from .workspace_service import LIGHTCURVE_OBJECT_ROOT
+
+        allowed_roots = [
+            LIGHTCURVE_OBJECT_ROOT.resolve(),
+            (PROJECT_ROOT / "data" / "lightcurves").resolve(),
+        ]
+        if not any(destination == root or root in destination.parents for root in allowed_roots):
             raise RuntimeError(
-                f"Refusing to materialize dataset outside {allowed_root}: {download_dir}"
+                f"Refusing to materialize dataset outside managed roots: {download_dir}"
             )
         if (destination / "manifest.json").exists():
             return destination
@@ -529,7 +534,7 @@ class PersistenceService:
 
     def health(self) -> dict[str, Any]:
         if not self.enabled:
-            return {"backend": "filesystem", "status": "ok"}
+            return {"backend": "sqlite-warehouse", "status": "ok"}
         import sqlalchemy as sa
 
         try:

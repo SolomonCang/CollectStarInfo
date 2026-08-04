@@ -40,6 +40,7 @@ services:
       - "${TARGET_INFO_PORT:-8000}:8000"
     environment:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      APP_MASTER_KEY: ${APP_MASTER_KEY:?APP_MASTER_KEY is required for postgres-s3 mode}
       PERSISTENCE_BACKEND: postgres-s3
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-target_info}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-target_info}
       S3_ENDPOINT_URL: http://minio:9000
@@ -57,6 +58,7 @@ services:
       # This is a disposable compute cache; PostgreSQL + MinIO are authoritative.
       - app-work-cache:/app/data
       - app-results-cache:/app/results
+      - app-warehouse-cache:/app/warehouse
     restart: unless-stopped
 
 volumes:
@@ -64,3 +66,4 @@ volumes:
   minio-data:
   app-work-cache:
   app-results-cache:
+  app-warehouse-cache:

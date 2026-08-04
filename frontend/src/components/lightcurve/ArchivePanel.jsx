@@ -104,8 +104,8 @@ export default function ArchivePanel({
         </div>
         <div className="cache-actions">
           <button type="button" onClick={onCacheVerify} disabled={cacheBusy}>校验</button>
-          <button type="button" onClick={() => onCacheCleanup(true)} disabled={cacheBusy}>预览清理</button>
-          <button type="button" className="danger-button" onClick={() => onCacheCleanup(false)} disabled={cacheBusy}>执行清理</button>
+          {onCacheCleanup ? <button type="button" onClick={() => onCacheCleanup(true)} disabled={cacheBusy}>预览清理</button> : null}
+          {onCacheCleanup ? <button type="button" className="danger-button" onClick={() => onCacheCleanup(false)} disabled={cacheBusy}>执行清理</button> : null}
         </div>
         {cacheMessage ? <div className="muted-text">{cacheMessage}</div> : null}
       </div>

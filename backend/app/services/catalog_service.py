@@ -1,11 +1,8 @@
-"""
-Unified data catalog service.
+"""Database-backed shared scientific data catalog.
 
-Manages a single ``data/catalog.json`` index that registers every persisted
-data item across the project — target results (``results/``) and light-curve
-datasets (``data/lightcurves/``).  The catalog is the single source of truth
-for the Data Manager page and allows cross-source browsing, multi-select
-analysis, and batch operations.
+SQLite/PostgreSQL workspace tables are authoritative.  A read-only
+``warehouse/manifests/catalog.json`` export is refreshed for legacy readers;
+the Data Manager queries the relational view directly.
 
 TTL-based expiry is *disabled by default* — data lives until the user
 explicitly deletes it.
@@ -35,8 +32,9 @@ from .lightcurve_cache_service import (
     validate_dataset_dir,
 )
 from .persistence_service import persistence
+from .workspace_service import MANIFEST_ROOT, WAREHOUSE_ROOT, workspace
 
-CATALOG_PATH = DATA_ROOT.parent / "catalog.json"
+CATALOG_PATH = MANIFEST_ROOT / "catalog.json"
 CATALOG_VERSION = 1
 
 RESULTS_DIR = PROJECT_ROOT / "results"
@@ -45,6 +43,15 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 def _normalize_star_name(name: str) -> str:
     """Normalize a star name for grouping (case-insensitive, whitespace-collapsed)."""
     return " ".join((name or "").strip().lower().split())
+
+
+def _resolve_catalog_path(value: str) -> Path:
+    candidate = Path(value)
+    resolved = (candidate if candidate.is_absolute() else PROJECT_ROOT / candidate).resolve()
+    root = WAREHOUSE_ROOT.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise HTTPException(status_code=400, detail="目录条目路径不在 warehouse 内")
+    return resolved
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -300,16 +307,9 @@ def _scan_lightcurve_files() -> Iterator[dict[str, Any]]:
 
 
 def _rebuild_catalog() -> dict[str, Any]:
-    """Full scan of results/ + data/lightcurves/ → catalog.json."""
-    local_entries: list[dict[str, Any]] = []
-    local_entries.extend(_scan_target_results())
-    local_entries.extend(_scan_lightcurve_files())
-    entries_by_id = {
-        entry["id"]: entry for entry in persistence.load_catalog()
-    }
-    entries_by_id.update({entry["id"]: entry for entry in local_entries})
-    entries = list(entries_by_id.values())
-    persistence.upsert_catalog(local_entries)
+    """Export the authoritative relational catalog for legacy readers."""
+    entries = workspace.catalog_entries()
+    persistence.upsert_catalog(entries)
     catalog: dict[str, Any] = {
         "version": CATALOG_VERSION,
         "updated_at": utc_now(),
@@ -321,19 +321,7 @@ def _rebuild_catalog() -> dict[str, Any]:
 
 
 def _load_catalog() -> dict[str, Any]:
-    """Return current catalog, rebuilding if missing or stale."""
-    remote_entries = persistence.load_catalog()
-    if remote_entries:
-        return {
-            "version": CATALOG_VERSION,
-            "updated_at": utc_now(),
-            "entries": remote_entries,
-        }
-    if CATALOG_PATH.exists():
-        catalog = read_json(CATALOG_PATH, {})
-        if isinstance(catalog,
-                      dict) and catalog.get("version") == CATALOG_VERSION:
-            return catalog
+    """Return a fresh database-backed view of the shared catalog."""
     return _rebuild_catalog()
 
 
@@ -427,9 +415,7 @@ class CatalogService:
             raise HTTPException(status_code=404,
                                 detail=f"Entry not found: {entry_id}")
 
-        file_path = Path(target_entry["file_path"])
-        abs_path = file_path if file_path.is_absolute(
-        ) else PROJECT_ROOT / file_path
+        abs_path = _resolve_catalog_path(target_entry["file_path"])
 
         removed_bytes = 0
         if abs_path.exists():
@@ -458,6 +444,10 @@ class CatalogService:
         if target_entry.get("type") == "target_result":
             removed_bytes = max(
                 removed_bytes,
+                workspace.delete_target(target_entry.get("display_name", "")),
+            )
+            removed_bytes = max(
+                removed_bytes,
                 persistence.delete_target(
                     target_entry.get("metadata", {}).get(
                         "persistence_target_key"
@@ -467,6 +457,10 @@ class CatalogService:
                 or 0,
             )
         else:
+            workspace.unregister_dataset(
+                target_entry.get("metadata", {}).get("download_dir")
+                or target_entry.get("file_path", "")
+            )
             removed_bytes = max(
                 removed_bytes,
                 persistence.delete_dataset_object(
@@ -626,9 +620,7 @@ class CatalogService:
         display_name = to_delete[0].get("display_name", star_name)
         deleted_ids: list[str] = []
         for entry in to_delete:
-            file_path = Path(entry["file_path"])
-            abs_path = file_path if file_path.is_absolute(
-            ) else PROJECT_ROOT / file_path
+            abs_path = _resolve_catalog_path(entry["file_path"])
             if abs_path.exists():
                 if abs_path.is_dir():
                     from .lightcurve_cache_service import unique_storage_size
@@ -663,6 +655,10 @@ class CatalogService:
                     or 0,
                 )
             else:
+                workspace.unregister_dataset(
+                    entry.get("metadata", {}).get("download_dir")
+                    or entry.get("file_path", "")
+                )
                 total_removed += (
                     persistence.delete_dataset_object(
                         entry.get("file_path", "")
@@ -670,6 +666,8 @@ class CatalogService:
                     or 0
                 )
             persistence.delete_catalog_entry(entry.get("id", ""))
+
+        total_removed = max(total_removed, workspace.delete_target(display_name))
 
         new_catalog = _rebuild_catalog()
         return {

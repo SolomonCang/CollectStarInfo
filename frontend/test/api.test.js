@@ -1,6 +1,6 @@
 import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { listStars, queryTarget } from "../src/api.js";
+import { listStars, login, queryTarget, setCsrfToken } from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -52,12 +52,35 @@ test("queryTarget forwards abort signals and JSON payloads", async () => {
   assert.equal(request.url, "/api/targets/query");
   assert.equal(request.options.method, "POST");
   assert.equal(request.options.signal, controller.signal);
+  assert.equal(request.options.credentials, "include");
   assert.equal(request.options.headers.get("Content-Type"), "application/json");
   assert.deepEqual(JSON.parse(request.options.body), {
     target: "AD Leo",
     use_llm: false,
     force_refresh: false,
   });
+});
+
+test("login stores a CSRF token and authenticated writes send it", async () => {
+  const values = new Map();
+  globalThis.sessionStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  };
+  const requests = [];
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return new Response(JSON.stringify({ user: { username: "alice", csrf_token: "csrf-1" } }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  await login({ username: "alice", password: "password" });
+  await queryTarget({ target: "AD Leo" });
+  assert.equal(requests[1].options.headers.get("X-CSRF-Token"), "csrf-1");
+  delete globalThis.sessionStorage;
+  setCsrfToken("");
 });
 
 test("API errors expose FastAPI detail instead of raw response JSON", async () => {
@@ -69,8 +92,9 @@ test("API errors expose FastAPI detail instead of raw response JSON", async () =
     }
   );
 
-  await assert.rejects(
-    () => queryTarget({ target: "missing" }),
-    /Target not found/
-  );
+  await assert.rejects(() => queryTarget({ target: "missing" }), (error) => {
+    assert.match(error.message, /Target not found/);
+    assert.equal(error.status, 404);
+    return true;
+  });
 });

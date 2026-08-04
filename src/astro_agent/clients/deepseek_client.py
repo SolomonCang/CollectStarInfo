@@ -9,7 +9,7 @@ import requests
 from ..models import GaiaRecord, LiteratureWorkflow, MastRecord, PlanetRecord, SimbadRecord
 
 
-class DeepSeekClient:
+class OpenAICompatibleClient:
 
     _MAX_REFS_FOR_LLM = 180
     _CHUNK_SIZE = 30
@@ -26,6 +26,15 @@ class DeepSeekClient:
         self._endpoint = f"{base_url}/chat/completions"
         self._model = model
         self._timeout_sec = timeout_sec
+
+    def test_connection(self) -> str:
+        """Run the smallest useful Chat Completions compatibility check."""
+        return self._chat(
+            system_prompt="Reply with OK only.",
+            user_prompt="connection test",
+            temperature=0.0,
+            max_tokens=4,
+        )
 
     def summarize(
         self,
@@ -426,44 +435,39 @@ class DeepSeekClient:
         return re.sub(r'\[([^\[\]]*[A-Za-z][^\[\]]*)\]', replace, report)
 
     def _chat(self, system_prompt: str, user_prompt: str,
-              temperature: float) -> str:
+              temperature: float, max_tokens: int | None = None) -> str:
+        payload: dict[str, object] = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         resp = requests.post(
             self._endpoint,
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model":
-                self._model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": system_prompt
-                    },
-                    {
-                        "role": "user",
-                        "content": user_prompt
-                    },
-                ],
-                "temperature":
-                temperature,
-            },
+            json=payload,
             timeout=self._timeout_sec,
         )
         if not resp.ok:
             body = resp.text.strip()
             body = body[:800] if body else "<empty>"
-            raise RuntimeError(f"DeepSeek HTTP {resp.status_code}: {body}")
+            raise RuntimeError(f"LLM HTTP {resp.status_code}: {body}")
 
         data = resp.json()
         choices = data.get("choices", [])
         if not choices:
-            raise RuntimeError("DeepSeek response has no choices")
+            raise RuntimeError("LLM response has no choices")
 
         content = choices[0].get("message", {}).get("content")
         if not content:
-            raise RuntimeError("DeepSeek response has empty content")
+            raise RuntimeError("LLM response has empty content")
         return str(content).strip()
 
     def _build_payload(
@@ -558,3 +562,7 @@ class DeepSeekClient:
             "references_count_total": len(simbad.references),
             "references_used_for_llm": references_for_llm,
         }
+
+
+# Backward-compatible import for CLI users and existing integrations.
+DeepSeekClient = OpenAICompatibleClient

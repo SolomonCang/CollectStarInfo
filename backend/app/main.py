@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import socket
 
-from fastapi import FastAPI, Path, Query
+from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -19,6 +19,9 @@ from .services.lightcurve_fits_service import LightCurveFitsService
 from .services.lightcurve_service import analyze_light_curve
 from .services.target_service import TargetSearchService
 from .services.persistence_service import persistence
+from .services.workspace_service import SessionIdentity, WAREHOUSE_ROOT, workspace
+from .auth import require_admin, require_user
+from .workspace_routes import router as workspace_router
 
 
 def _get_lan_ip() -> str | None:
@@ -85,6 +88,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(workspace_router)
 
 target_service = TargetSearchService()
 lightcurve_archive_service = LightCurveArchiveService()
@@ -98,8 +102,9 @@ async def _ensure_data_dirs() -> None:
     """Ensure data/ directories exist on first launch (not synced via git)."""
     from pathlib import Path
     project_root = Path(__file__).resolve().parents[3]
-    (project_root / "data" / "lightcurves").mkdir(parents=True, exist_ok=True)
+    (WAREHOUSE_ROOT / "objects" / "lightcurves").mkdir(parents=True, exist_ok=True)
     (project_root / "results").mkdir(parents=True, exist_ok=True)
+    workspace.initialize()
     persistence.initialize()
     # Rebuild catalog if missing (e.g. fresh clone)
     if not persistence.enabled:
@@ -117,69 +122,87 @@ def _sync_catalog() -> None:
 @app.get("/api/health")
 def health() -> dict:
     storage = persistence.health()
+    workspace_health = workspace.health()
     return {
-        "status": "ok" if storage.get("status") == "ok" else "degraded",
+        "status": "ok" if storage.get("status") == "ok" and workspace_health.get("status") == "ok" else "degraded",
         "storage": storage,
+        "workspace": workspace_health,
     }
 
 
 @app.post("/api/targets/query")
-async def query_target(request: TargetQueryRequest) -> dict:
-    return await target_service.query_target(request)
+async def query_target(
+        request: TargetQueryRequest,
+        identity: SessionIdentity = Depends(require_user)) -> dict:
+    return await target_service.query_target(request, identity)
 
 
 @app.post("/api/literature/research")
-async def research_literature(request: LiteratureResearchRequest) -> dict:
-    return await target_service.research_literature(request)
+async def research_literature(
+        request: LiteratureResearchRequest,
+        identity: SessionIdentity = Depends(require_user)) -> dict:
+    return await target_service.research_literature(request, identity)
 
 
 @app.post("/api/lightcurves/analyze")
-def analyze_lightcurve(request: LightCurveAnalysisRequest) -> dict:
+def analyze_lightcurve(request: LightCurveAnalysisRequest,
+                       _: SessionIdentity = Depends(require_user)) -> dict:
     return analyze_light_curve(request)
 
 
 @app.post("/api/lightcurves/search")
-def search_lightcurves(request: LightCurveArchiveSearchRequest) -> dict:
+def search_lightcurves(request: LightCurveArchiveSearchRequest,
+                       _: SessionIdentity = Depends(require_user)) -> dict:
     return lightcurve_archive_service.search(request)
 
 
 @app.post("/api/lightcurves/download")
-def download_lightcurves(request: LightCurveArchiveDownloadRequest) -> dict:
+def download_lightcurves(request: LightCurveArchiveDownloadRequest,
+                         _: SessionIdentity = Depends(require_user)) -> dict:
     result = lightcurve_archive_service.download(request)
     csv_result = lightcurve_fits_service.write_dataset_csv(
         LightCurveDatasetRequest(download_dir=result["download_dir"],
                                  quality_filter=True,
                                  max_points=100000))
     result["csv"] = csv_result
+    from .services.lightcurve_cache_service import resolve_data_path
+    workspace.register_dataset(resolve_data_path(result["download_dir"]), result)
     _sync_catalog()
     return result
 
 
 @app.get("/api/lightcurves/datasets")
-def list_lightcurve_datasets(target: str | None = None) -> dict:
+def list_lightcurve_datasets(target: str | None = None,
+                             _: SessionIdentity = Depends(require_user)) -> dict:
     return lightcurve_fits_service.list_datasets(target=target)
 
 
 @app.post("/api/lightcurves/datasets/delete")
-def delete_lightcurve_dataset(request: LightCurveDatasetDeleteRequest) -> dict:
+def delete_lightcurve_dataset(request: LightCurveDatasetDeleteRequest,
+                              _: SessionIdentity = Depends(require_admin)) -> dict:
     result = lightcurve_cache_service.delete_dataset(request.download_dir)
+    workspace.unregister_dataset(request.download_dir)
     _sync_catalog()
     return result
 
 
 @app.get("/api/lightcurves/cache/stats")
-def lightcurve_cache_stats() -> dict:
+def lightcurve_cache_stats(_: SessionIdentity = Depends(require_user)) -> dict:
     return lightcurve_cache_service.stats()
 
 
 @app.post("/api/lightcurves/cache/verify")
-def verify_lightcurve_cache(request: LightCurveCacheVerifyRequest) -> dict:
+def verify_lightcurve_cache(request: LightCurveCacheVerifyRequest,
+                            identity: SessionIdentity = Depends(require_user)) -> dict:
+    if request.repair and not identity.is_admin:
+        raise HTTPException(status_code=403, detail="修复缓存需要管理员权限")
     return lightcurve_cache_service.verify(deep=request.deep,
                                            repair=request.repair)
 
 
 @app.post("/api/lightcurves/cache/cleanup")
-def cleanup_lightcurve_cache(request: LightCurveCacheCleanupRequest) -> dict:
+def cleanup_lightcurve_cache(request: LightCurveCacheCleanupRequest,
+                             _: SessionIdentity = Depends(require_admin)) -> dict:
     return lightcurve_cache_service.cleanup(
         max_age_days=request.max_age_days,
         max_size_mb=request.max_size_mb,
@@ -189,13 +212,15 @@ def cleanup_lightcurve_cache(request: LightCurveCacheCleanupRequest) -> dict:
 
 
 @app.post("/api/lightcurves/load")
-def load_lightcurve_dataset(request: LightCurveDatasetRequest) -> dict:
+def load_lightcurve_dataset(request: LightCurveDatasetRequest,
+                            _: SessionIdentity = Depends(require_user)) -> dict:
     return lightcurve_fits_service.load_dataset(request)
 
 
 @app.post("/api/lightcurves/analyze-dataset")
 def analyze_lightcurve_dataset(
-        request: LightCurveDatasetAnalysisRequest) -> dict:
+        request: LightCurveDatasetAnalysisRequest,
+        _: SessionIdentity = Depends(require_user)) -> dict:
     return lightcurve_fits_service.analyze_dataset(request)
 
 
@@ -203,12 +228,13 @@ def analyze_lightcurve_dataset(
 
 
 @app.get("/api/catalog/stats")
-def catalog_stats() -> dict:
+def catalog_stats(_: SessionIdentity = Depends(require_user)) -> dict:
     return catalog_service.stats()
 
 
 @app.post("/api/catalog/entries")
-def catalog_list_entries(request: CatalogListRequest) -> dict:
+def catalog_list_entries(request: CatalogListRequest,
+                         _: SessionIdentity = Depends(require_user)) -> dict:
     return catalog_service.list_entries(
         entry_type=request.entry_type,
         source=request.source,
@@ -220,17 +246,20 @@ def catalog_list_entries(request: CatalogListRequest) -> dict:
 
 
 @app.get("/api/catalog/entries/{entry_id}")
-def catalog_get_entry(entry_id: str) -> dict:
+def catalog_get_entry(entry_id: str,
+                      _: SessionIdentity = Depends(require_user)) -> dict:
     return catalog_service.get_entry(entry_id)
 
 
 @app.delete("/api/catalog/entries/{entry_id}")
-def catalog_delete_entry(entry_id: str) -> dict:
+def catalog_delete_entry(entry_id: str,
+                         _: SessionIdentity = Depends(require_admin)) -> dict:
     return catalog_service.delete_entry(entry_id)
 
 
 @app.post("/api/catalog/entries/batch-delete")
-def catalog_batch_delete(request: CatalogBatchDeleteRequest) -> dict:
+def catalog_batch_delete(request: CatalogBatchDeleteRequest,
+                         _: SessionIdentity = Depends(require_admin)) -> dict:
     return catalog_service.batch_delete(request.entry_ids)
 
 
@@ -242,6 +271,7 @@ def catalog_list_stars(
                                    description="Filter by data source"),
         offset: int = Query(default=0, ge=0),
         limit: int = Query(default=50, ge=1, le=500),
+        _: SessionIdentity = Depends(require_user),
 ) -> dict:
     return catalog_service.list_stars(
         search=search,
@@ -252,12 +282,13 @@ def catalog_list_stars(
 
 
 @app.delete("/api/catalog/stars/{star_name:path}")
-def catalog_delete_star(star_name: str) -> dict:
+def catalog_delete_star(star_name: str,
+                        _: SessionIdentity = Depends(require_admin)) -> dict:
     return catalog_service.delete_star(star_name)
 
 
 @app.post("/api/catalog/rebuild")
-def catalog_rebuild() -> dict:
+def catalog_rebuild(_: SessionIdentity = Depends(require_admin)) -> dict:
     return catalog_service.rebuild()
 
 

@@ -8,7 +8,9 @@ services:
       - "8000:8000"
     environment:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - PERSISTENCE_BACKEND=sqlite-warehouse
     volumes:
+      - ./warehouse:/app/warehouse
       - ./results:/app/results
       - ./data:/app/data
     restart: unless-stopped

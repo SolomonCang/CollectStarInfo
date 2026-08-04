@@ -22,6 +22,7 @@ node_modules/
 # Local outputs
 results/
 data/
+warehouse/
 *.log
 
 # Docker wheels (offline packages)

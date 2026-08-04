@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { queryTarget, researchLiterature } from "../api";
+import { listLlmProfiles, queryTarget, researchLiterature } from "../api";
 
 export function useTargetWorkspace() {
   const [targetName, setTargetName] = useState("AD Leo");
@@ -13,10 +13,20 @@ export function useTargetWorkspace() {
   const [literatureReport, setLiteratureReport] = useState(null);
   const [literatureBusy, setLiteratureBusy] = useState(false);
   const [prescreenKeywords, setPrescreenKeywords] = useState(true);
+  const [llmProfiles, setLlmProfiles] = useState([]);
+  const [llmProfileId, setLlmProfileId] = useState("");
   const [error, setError] = useState("");
   const queryControllerRef = useRef(null);
 
   useEffect(() => () => queryControllerRef.current?.abort(), []);
+
+  useEffect(() => {
+    listLlmProfiles().then((result) => {
+      const profiles = result.profiles || [];
+      setLlmProfiles(profiles);
+      setLlmProfileId((current) => current || profiles.find((profile) => profile.is_default)?.id || profiles[0]?.id || "");
+    }).catch(() => {});
+  }, []);
 
   const handleTargetQuery = useCallback(async (event) => {
     event?.preventDefault();
@@ -31,9 +41,11 @@ export function useTargetWorkspace() {
         target: targetName,
         use_llm: useLlm,
         force_refresh: forceRefresh,
+        llm_profile_id: llmProfileId || null,
       }, { signal: controller.signal });
       setTargetResult(result);
       setLiteratureReport(null);
+      if (result.llm_error) setError(result.llm_error);
     } catch (caught) {
       if (caught.name !== "AbortError") setError(caught.message);
     } finally {
@@ -42,7 +54,7 @@ export function useTargetWorkspace() {
         setTargetBusy(false);
       }
     }
-  }, [targetName, useLlm, forceRefresh]);
+  }, [targetName, useLlm, forceRefresh, llmProfileId]);
 
   const handleLiteratureResearch = useCallback(async () => {
     const target = targetResult?.target;
@@ -59,6 +71,7 @@ export function useTargetWorkspace() {
         literature_workflow: target.literature_workflow ?? null,
         focus_question: literatureQuestion,
         prescreen_keywords: prescreenKeywords,
+        llm_profile_id: llmProfileId || null,
       });
       setLiteratureReport(response);
     } catch (caught) {
@@ -66,7 +79,7 @@ export function useTargetWorkspace() {
     } finally {
       setLiteratureBusy(false);
     }
-  }, [targetResult, targetName, literatureQuestion, prescreenKeywords]);
+  }, [targetResult, targetName, literatureQuestion, prescreenKeywords, llmProfileId]);
 
   const targetReferences = targetResult?.target?.literature_references;
   const references = targetReferences?.length
@@ -81,10 +94,13 @@ export function useTargetWorkspace() {
     literatureBusy,
     literatureQuestion,
     literatureReport,
+    llmProfileId,
+    llmProfiles,
     prescreenKeywords,
     references,
     setForceRefresh,
     setLiteratureQuestion,
+    setLlmProfileId,
     setPrescreenKeywords,
     setTargetName,
     setUseLlm,

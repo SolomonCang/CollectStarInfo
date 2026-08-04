@@ -2,11 +2,11 @@
 
 ## 中文使用说明
 
-这是一个用于检索恒星/天体信息的工具，会整合 SIMBAD、Gaia DR3、MAST 等数据源，并输出结构化报告。当前已新增交互式 Web 架构：FastAPI 后端复用原有检索逻辑，React 前端可查询目标、调用 DeepSeek 做文献调研，从 MAST 检索/下载 TESS、Kepler、K2 光变曲线产品，并对本地光变曲线做去趋势、周期搜索和相位折叠。
+这是一个用于检索恒星/天体信息的工具，会整合 SIMBAD、Gaia DR3、MAST 等数据源，并输出结构化报告。交互式 Web 工作台采用本地账号、SQLite 目录数据库和 `warehouse/` 文件层；可查询目标、通过用户私有的 OpenAI 兼容接口完成总结和文献调研，从 MAST 检索/下载 TESS、Kepler、K2 光变曲线产品，并对本地光变曲线做去趋势、周期搜索和相位折叠。
 
 命令行批处理仍可直接运行 `run_agent.py`；交互式工具见下方“Web 工作台”。
 
-配置方式：统一使用 `config.yaml`，不再使用环境变量文件。
+命令行继续使用 `config.yaml` 和可选的 `DSAPI.key`；Web 工作台的模型端点与 API Key 在登录后通过“插件中心 → 大模型接口”独立配置。
 
 1. 安装依赖
    - `python3 -m venv .venv && source .venv/bin/activate`
@@ -24,6 +24,14 @@
 
 ## Web 工作台
 
+首次运行先创建管理员（公开注册默认关闭）：
+
+```bash
+.venv/bin/python -m backend.app.manage create-admin --username admin
+```
+
+命令会交互式读取密码。管理员登录后可创建或禁用用户，也可生成仅显示一次的临时密码；使用临时密码的用户必须在首次登录后修改密码。
+
 后端：
 
 ```bash
@@ -38,14 +46,46 @@ npm install
 npm run dev
 ```
 
-前端默认连接 `http://127.0.0.1:8000`。工作台分为“目标信息”和“光变曲线”两个页面；文献调研面板会使用 `DSAPI.key` 中的 DeepSeek API Key 和 `config.yaml` 中的模型配置，对当前目标的 SIMBAD references 和 literature workflow 做中文分析。
+前端默认连接 `http://127.0.0.1:8000`。工作台包含“恒星主页”“数据发现与入库”“光变实验室”“插件中心”和“数据管理”；管理员额外看到“用户管理”。目标快照和光变数据在用户间共享，模型配置、API Key、提示输入和 AI 历史只对其所有者可见。普通用户可查询、刷新、下载和分析，但删除共享数据、缓存清理和目录重建只允许管理员执行。
+
+### 默认 SQLite + warehouse 存储
+
+默认 `PERSISTENCE_BACKEND=sqlite-warehouse`，权威元数据位于 `warehouse/db/target_info.sqlite`，正文与数组保存在文件层：
+
+```text
+warehouse/
+  db/target_info.sqlite
+  objects/targets/<target-id>/<snapshot-id>/
+  objects/lightcurves/<target-id>/<dataset-id>/
+  objects/llm/<user-id>/<target-id>/<run-id>/
+  cache/{mast-search,products,derived,analysis}/
+  manifests/
+  secrets/master.key
+```
+
+本地首次需要加密模型密钥时会原子生成权限为 `0600` 的 `warehouse/secrets/master.key`。服务器和容器部署应改用 `APP_MASTER_KEY` 注入 32 字节密钥，例如：
+
+```bash
+python -c 'import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())'
+```
+
+API Key 使用 AES-GCM 加密，接口、日志和管理页面都不会返回明文。会话使用数据库中的不透明令牌、HttpOnly/SameSite Cookie，并对所有写请求校验 CSRF Token。
+
+### 迁移现有数据
+
+迁移遵循“预检—复制—校验—切换”，不会删除或修改 `results/`、`data/lightcurves/` 及旧缓存。指定的所有者账号用于接收旧摘要和 DeepSeek 配置：
+
+```bash
+.venv/bin/python scripts/migrate_to_warehouse.py --dry-run --owner admin
+.venv/bin/python scripts/migrate_to_warehouse.py --execute --owner admin
+.venv/bin/python scripts/migrate_to_warehouse.py --verify warehouse/manifests/migration-UUID.json
+```
+
+复制使用临时文件、原子重命名和 SHA-256 校验，并按目标、产品 URI 与内容哈希去重。命令可安全重复执行；冲突记录到报告而不会静默覆盖。管理员页面只读展示迁移状态，迁移本身只能通过 CLI 发起。
 
 ### PostgreSQL + MinIO/S3 分离式存储
 
-默认的 `PERSISTENCE_BACKEND=filesystem` 完全兼容原来的本地目录模式。生产环境可以设置
-`PERSISTENCE_BACKEND=postgres-s3`：PostgreSQL 作为目标结果、数据集及统一目录的权威元数据源，
-MinIO 或兼容 S3 的服务保存 JSON、FITS、CSV 等对象。本地 `results/` 和 `data/` 在该模式下只作为
-可丢弃的计算缓存；任意 API 节点收到分析请求后都会按需从对象存储恢复数据集。
+生产环境可以设置 `PERSISTENCE_BACKEND=postgres-s3`：账号、工作台目录及对象索引使用同一套关系模型，PostgreSQL 作为权威元数据源，MinIO 或兼容 S3 的服务保存 JSON、FITS、CSV 等对象。旧 PostgreSQL/S3 表和对象镜像继续兼容，业务接口不需要判断具体存储后端。
 
 本机启动完整环境：
 
@@ -75,6 +115,7 @@ S3_SECRET_KEY=...
 S3_BUCKET=target-info-search
 S3_REGION=us-east-1
 S3_CREATE_BUCKET=false
+APP_MASTER_KEY=<base64-url-encoded-32-byte-key>
 ```
 
 AWS S3 可省略 `S3_ENDPOINT_URL`。生产环境应通过 Docker secret、Kubernetes Secret 或密钥管理服务
@@ -95,22 +136,21 @@ python scripts/migrate_to_postgres_s3.py --dry-run
 python scripts/migrate_to_postgres_s3.py
 ```
 
-应用启动时会自动创建所需表；需要由 DBA 预建表时，可执行
-`migrations/001_postgres_s3.sql`。数据库记录和对象上传均为幂等 upsert，迁移脚本可以安全重跑。
+应用启动时会自动创建所需表；需要由 DBA 预建表时，依次执行 `migrations/001_postgres_s3.sql` 和 `migrations/002_workspace.sql`。数据库记录和对象上传均为幂等 upsert，迁移脚本可以安全重跑。
 
-目标查询默认会优先载入 `results/<target>.json` 中已有信息，避免重复访问外部数据库；在前端勾选“强制重新检索”后，会重新调用 SIMBAD/Gaia/MAST/DeepSeek，并把新的 JSON 写回 `results/`。
+目标查询默认优先载入 SQLite 目录中的最新快照，迁移前也会兼容读取 `results/<target>.json`；“强制重新检索”会重新调用 SIMBAD/Gaia/MAST 并保存新的共享快照。LLM 失败不会影响科学检索结果，其总结作为当前用户的独立运行记录保存。
 
 MAST 光变曲线使用三层缓存。用户可见的数据集写入：
 
 ```text
-data/lightcurves/<target>/<timestamp>-<uuid>/
+warehouse/objects/lightcurves/<target>/<timestamp>-<uuid>/
 ```
 
 其中包含产品硬链接（文件系统不支持时自动复制）、`selected_products.json`、带完整性信息的 `manifest.json` 和后端自动转换出的 `lightcurve.csv`。`results/` 继续只作为目标查询报告目录，不再混放下载数据。旧版时间戳目录和 manifest 保持兼容，无需手动迁移。
 
-内部共享缓存位于 `data/lightcurves/_cache/`：
+内部共享缓存位于 `warehouse/cache/`：
 
-- `search/`：按目标/坐标、半径、任务和数量参数缓存 MAST 检索结果，默认 TTL 为 6 小时；可通过 `LIGHTCURVE_SEARCH_CACHE_TTL` 修改。
+- `mast-search/`：按目标/坐标、半径、任务和数量参数缓存 MAST 检索结果，默认 TTL 为 6 小时；可通过 `LIGHTCURVE_SEARCH_CACHE_TTL` 修改。
 - `products/`：按产品 URI 缓存单个 FITS，并保存文件大小和 SHA-256；不同目标别名和产品组合可以共享同一文件。
 - `derived/`：按 FITS 指纹、flux column、质量过滤规则缓存标准化数组。
 - `analysis/`：按数据指纹、降采样、去趋势和周期搜索参数缓存分析结果。

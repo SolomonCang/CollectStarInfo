@@ -113,7 +113,7 @@ function LiteratureReport({ report, targetName }) {
     }).join("\n");
     const keywordText = keywords.length ? keywords.join(", ") : "无";
     const safeTarget = (targetName || "文献调研").replace(/[\\/:*?"<>|]/g, "_");
-    const md = `# ${safeTarget} 文献调研报告\n\n> 生成时间: ${new Date().toLocaleString()}\n\n## 统计\n\n- 总文献数: ${total ?? "-"}\n- 预筛选后: ${afterPrescreen ?? "-"}\n- 送入 DeepSeek: ${used ?? "-"}\n\n## 筛选关键词\n\n${keywordText}\n\n## 调研报告\n\n${report.report}\n\n## 参考文献\n\n${refLines}\n`;
+    const md = `# ${safeTarget} 文献调研报告\n\n> 生成时间: ${new Date().toLocaleString()}\n\n## 统计\n\n- 总文献数: ${total ?? "-"}\n- 预筛选后: ${afterPrescreen ?? "-"}\n- 送入大模型: ${used ?? "-"}\n\n## 筛选关键词\n\n${keywordText}\n\n## 调研报告\n\n${report.report}\n\n## 参考文献\n\n${refLines}\n`;
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -126,7 +126,7 @@ function LiteratureReport({ report, targetName }) {
       <div className="literature-meta">
         <span>References: {total ?? "-"} total</span>
         {Number.isFinite(afterPrescreen) && <span>{afterPrescreen} after prescreen</span>}
-        {Number.isFinite(used) && <span>{used} sent to DeepSeek</span>}
+        {Number.isFinite(used) && <span>{used} sent to LLM</span>}
       </div>
       <button type="button" className="ghost-button export-md-button" onClick={handleExportMarkdown}>
         <Download size={15} /> 导出 Markdown
@@ -253,7 +253,7 @@ function TargetSummary({ result }) {
   return (
     <>
       <div className="summary-grid">
-        <Metric label="Source" value={result.source === "results" ? "已有结果" : "重新检索"} />
+        <Metric label="Source" value={["results", "warehouse", "postgres-s3"].includes(result.source) ? "已有结果" : "重新检索"} />
         <Metric label="Result file" value={result.result_path} />
         <Metric label="Resolved" value={target.resolved_target || target.query_target} />
         <Metric label="Type" value={target.target_type} />
@@ -278,10 +278,13 @@ export default function TargetPage({
   literatureBusy,
   literatureQuestion,
   literatureReport,
+  llmProfileId,
+  llmProfiles,
   prescreenKeywords,
   references,
   setForceRefresh,
   setLiteratureQuestion,
+  setLlmProfileId,
   setPrescreenKeywords,
   setTargetName,
   setUseLlm,
@@ -302,6 +305,13 @@ export default function TargetPage({
           <label className="checkbox-row">
             <input type="checkbox" checked={useLlm} onChange={(event) => setUseLlm(event.target.checked)} />
             使用 LLM 摘要
+          </label>
+          <label>
+            大模型配置
+            <select value={llmProfileId} onChange={(event) => setLlmProfileId(event.target.value)} disabled={!llmProfiles.length}>
+              {!llmProfiles.length ? <option value="">请先在插件中心配置</option> : null}
+              {llmProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name} · {profile.model}</option>)}
+            </select>
           </label>
           <label className="checkbox-row">
             <input type="checkbox" checked={forceRefresh} onChange={(event) => setForceRefresh(event.target.checked)} />
@@ -333,7 +343,7 @@ export default function TargetPage({
                 关键词预筛选
               </label>
               <button type="button" onClick={handleLiteratureResearch} disabled={!references.length || literatureBusy}>
-                {literatureBusy ? "调研中..." : `DeepSeek 调研 ${references.length || ""}`}
+                {literatureBusy ? "调研中..." : `LLM 调研 ${references.length || ""}`}
               </button>
             </div>
           </div>
@@ -348,7 +358,7 @@ export default function TargetPage({
           {literatureReport?.report ? (
             <LiteratureReport report={literatureReport} targetName={targetName} />
           ) : (
-            <EmptyState>完成目标查询后，可调用 DeepSeek 对该目标 references 做文献调研。</EmptyState>
+            <EmptyState>完成目标查询后，可使用当前模型配置对 references 做文献调研。</EmptyState>
           )}
         </div>
       </section>

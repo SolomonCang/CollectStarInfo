@@ -50,6 +50,7 @@ export default function StarCard({
   onToggleSelect,
   onDelete,
   busy,
+  canManage = false,
 }) {
   const { name, normalized, target_entry, lc_entries, total_size_bytes, entry_count, has_lc, has_target } = star;
   const meta = target_entry?.metadata || {};
@@ -78,7 +79,7 @@ export default function StarCard({
     <div className={`dm-star-card${expanded ? " expanded" : ""}${selected ? " selected" : ""}`}>
       {/* ── Card header ── */}
       <div className="dm-star-header" onClick={() => onToggleExpand(normalized)}>
-        <input
+        {canManage ? <input
           type="checkbox"
           className="dm-star-checkbox"
           aria-label={`选择 ${name}`}
@@ -89,7 +90,7 @@ export default function StarCard({
           }}
           onClick={(e) => e.stopPropagation()}
           disabled={busy}
-        />
+        /> : null}
 
         <button
           type="button"
@@ -132,7 +133,7 @@ export default function StarCard({
           </span>
         </div>
 
-        <div className="dm-star-actions">
+        {canManage ? <div className="dm-star-actions">
           {showDeleteConfirm ? (
             <>
               <button
@@ -171,7 +172,7 @@ export default function StarCard({
               删除
             </button>
           )}
-        </div>
+        </div> : null}
       </div>
 
       {/* ── Card body (expanded) ── */}

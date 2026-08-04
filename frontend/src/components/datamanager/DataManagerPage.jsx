@@ -12,7 +12,7 @@ import EmptyState from "../shared/EmptyState";
 import DataFilter from "./DataFilter";
 import StarCard from "./StarCard";
 
-export default function DataManagerPage() {
+export default function DataManagerPage({ isAdmin = false }) {
   const dm = useDataManagerState();
   const [deletingStar, setDeletingStar] = useState(null);
   const listControllerRef = useRef(null);
@@ -144,7 +144,7 @@ export default function DataManagerPage() {
           busy={dm.busy}
         />
         <div className="dm-toolbar-actions">
-          {dm.selectedStars.length > 0 ? (
+          {isAdmin && dm.selectedStars.length > 0 ? (
             <button
               type="button"
               className="danger-button"
@@ -155,7 +155,7 @@ export default function DataManagerPage() {
               删除选中 ({dm.selectedStars.length})
             </button>
           ) : null}
-          <button
+          {isAdmin ? <button
             type="button"
             className="ghost-button"
             onClick={handleRebuild}
@@ -163,7 +163,7 @@ export default function DataManagerPage() {
           >
             <RefreshCw size={16} />
             重建索引
-          </button>
+          </button> : null}
         </div>
       </div>
 
@@ -182,6 +182,7 @@ export default function DataManagerPage() {
               onToggleSelect={dm.toggleSelect}
               onDelete={handleDeleteSingle}
               busy={dm.busy && deletingStar === star.normalized}
+              canManage={isAdmin}
             />
           ))
         ) : dm.busy ? null : (
