@@ -110,6 +110,18 @@ def _database_url() -> str:
     return f"sqlite:///{DATABASE_PATH}"
 
 
+def _default_deepseek_api_key() -> str:
+    key_file = os.getenv("DEEPSEEK_API_KEY_FILE", "/app/DSAPI.key").strip()
+    if key_file:
+        try:
+            value = Path(key_file).read_text(encoding="utf-8").strip()
+        except OSError:
+            value = ""
+        if value:
+            return value
+    return os.getenv("DEEPSEEK_API_KEY", "").strip()
+
+
 @dataclass(frozen=True)
 class SessionIdentity:
     user_id: str
@@ -585,7 +597,12 @@ class WorkspaceService:
     def save_profile(self, owner_user_id: str, payload: dict[str, Any], profile_id: str | None = None) -> dict[str, Any]:
         table = self.tables["llm_profiles"]
         now = utc_now()
+        provider = str(payload.get("provider") or "custom").strip()
         api_key = str(payload.get("api_key") or "").strip()
+        uses_server_default = False
+        if not api_key and profile_id is None and provider == "deepseek":
+            api_key = _default_deepseek_api_key()
+            uses_server_default = bool(api_key)
         with self.connection() as connection:
             existing = None
             if profile_id:
@@ -596,15 +613,17 @@ class WorkspaceService:
                 raise KeyError(profile_id)
             if api_key:
                 nonce, ciphertext = self._encrypt(api_key)
-                suffix = api_key[-4:]
+                suffix = "默认" if uses_server_default else api_key[-4:]
             elif existing is not None:
                 nonce, ciphertext, suffix = existing["secret_nonce"], existing["secret_ciphertext"], existing["secret_suffix"]
+            elif provider == "deepseek":
+                raise ValueError("服务器默认 DeepSeek API Key 未配置，请填写 API Key 或联系管理员")
             else:
                 raise ValueError("API Key 不能为空")
             is_default = bool(payload.get("is_default", existing["is_default"] if existing else False))
             values = {
                 "name": str(payload.get("name") or "").strip(),
-                "provider": str(payload.get("provider") or "custom").strip(),
+                "provider": provider,
                 "base_url": str(payload.get("base_url") or "").strip().rstrip("/"),
                 "model": str(payload.get("model") or "").strip(),
                 "timeout_sec": max(5, min(300, int(payload.get("timeout_sec") or 45))),

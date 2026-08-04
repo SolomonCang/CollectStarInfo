@@ -80,7 +80,7 @@ export default function LlmPluginPage() {
   return (
     <section className="workspace-page llm-plugin-page">
       <header className="page-intro">
-        <div><span className="kicker">PRIVATE PLUGIN · OPENAI COMPATIBLE</span><h1>大模型接口</h1><p>配置仅属于当前账号的 DeepSeek、OpenAI 或自定义兼容端点；密钥加密保存在后端。</p></div>
+        <div><span className="kicker">PRIVATE PLUGIN · OPENAI COMPATIBLE</span><h1>大模型接口</h1><p>配置仅属于当前账号的 DeepSeek、OpenAI 或自定义兼容端点；DeepSeek 的 API Key 留空时使用服务器默认密钥。</p></div>
         <div className="coverage"><span>PRIVATE PROFILES</span><strong>{profiles.length} 个配置</strong><small>{runs.length} 次历史运行</small></div>
       </header>
       <ErrorBanner message={error} />
@@ -111,7 +111,7 @@ export default function LlmPluginPage() {
           }}>{presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
           <label>Base URL<input value={form.base_url} onChange={(event) => setForm({ ...form, base_url: event.target.value })} placeholder={selectedPreset?.base_url} required /></label>
           <label>模型<input value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} placeholder="输入接口支持的模型名称" required /></label>
-          <label>API Key<input type="password" autoComplete="new-password" value={form.api_key || ""} onChange={(event) => setForm({ ...form, api_key: event.target.value })} placeholder={editingId ? "留空则保持现有密钥" : "sk-…"} required={!editingId} /></label>
+          <label>API Key<input type="password" autoComplete="new-password" value={form.api_key || ""} onChange={(event) => setForm({ ...form, api_key: event.target.value })} placeholder={editingId ? "留空则保持现有密钥" : form.provider === "deepseek" ? "留空使用服务器默认 DeepSeek Key" : "请输入接口密钥"} required={!editingId && form.provider !== "deepseek"} /></label>
           <label>超时（秒）<input type="number" min={5} max={300} value={form.timeout_sec} onChange={(event) => setForm({ ...form, timeout_sec: Number(event.target.value) })} /></label>
           <label className="checkbox-row"><input type="checkbox" checked={form.is_default} onChange={(event) => setForm({ ...form, is_default: event.target.checked })} />设为默认配置</label>
           <label className="checkbox-row"><input type="checkbox" checked={form.is_enabled} onChange={(event) => setForm({ ...form, is_enabled: event.target.checked })} />启用此配置</label>

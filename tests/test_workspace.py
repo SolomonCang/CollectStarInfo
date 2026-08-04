@@ -85,6 +85,45 @@ class WorkspaceServiceTest(unittest.TestCase):
             row = connection.execute(sa.select(table)).mappings().one()
         self.assertNotIn(b"private-key", bytes(row["secret_ciphertext"]))
 
+    def test_deepseek_profile_can_use_server_default_key(self) -> None:
+        alice = self.service.create_user("alice", "alice-password")
+        with patch.dict(
+            os.environ,
+            {"DEEPSEEK_API_KEY": "test-server-default-key"},
+        ):
+            profile = self.service.save_profile(
+                alice["id"],
+                {
+                    "name": "Default DeepSeek",
+                    "provider": "deepseek",
+                    "base_url": "https://api.deepseek.com/v1",
+                    "model": "deepseek-chat",
+                    "api_key": "",
+                    "is_default": True,
+                },
+            )
+        self.assertEqual(profile["api_key_suffix"], "默认")
+        self.assertEqual(
+            self.service.get_profile_secret(alice["id"], profile["id"])[
+                "api_key"
+            ],
+            "test-server-default-key",
+        )
+
+    def test_custom_profile_still_requires_api_key(self) -> None:
+        alice = self.service.create_user("alice", "alice-password")
+        with self.assertRaisesRegex(ValueError, "API Key 不能为空"):
+            self.service.save_profile(
+                alice["id"],
+                {
+                    "name": "Custom",
+                    "provider": "custom",
+                    "base_url": "https://llm.example/v1",
+                    "model": "custom-model",
+                    "api_key": "",
+                },
+            )
+
     def test_local_master_key_is_created_with_owner_only_permissions(self) -> None:
         with patch.dict(os.environ, {"APP_MASTER_KEY": ""}):
             local_service = module.WorkspaceService(self.service.database_url)
