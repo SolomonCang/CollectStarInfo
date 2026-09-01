@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Activity, BarChart3, BookOpenText, Database, Download, ExternalLink, Orbit, Search } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import Metric from "../shared/Metric";
 import ErrorBanner from "../shared/ErrorBanner";
 import EmptyState from "../shared/EmptyState";
@@ -98,6 +100,31 @@ function ReferenceBrowser({ references }) {
   );
 }
 
+function LiteratureMarkdown({ children }) {
+  return (
+    <article className="literature-report">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ children: linkText, href }) => (
+            <a href={href} target="_blank" rel="noreferrer">
+              {linkText}
+              <ExternalLink size={12} aria-hidden="true" />
+            </a>
+          ),
+          table: ({ children: tableContents }) => (
+            <div className="literature-table-shell">
+              <table>{tableContents}</table>
+            </div>
+          ),
+        }}
+      >
+        {children}
+      </ReactMarkdown>
+    </article>
+  );
+}
+
 function LiteratureReport({ report, targetName }) {
   if (!report?.report) return null;
   const references = report.report_references ?? [];
@@ -131,7 +158,7 @@ function LiteratureReport({ report, targetName }) {
       <button type="button" className="ghost-button export-md-button" onClick={handleExportMarkdown}>
         <Download size={15} /> 导出 Markdown
       </button>
-      <article className="literature-report">{report.report}</article>
+      <LiteratureMarkdown>{report.report}</LiteratureMarkdown>
       {references.length > 0 && (
         <div className="report-references">
           <h3>参考文献</h3>

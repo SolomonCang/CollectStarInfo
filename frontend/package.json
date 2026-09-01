@@ -15,8 +15,10 @@
     "plotly.js-dist-min": "^3.7.0",
     "react": "latest",
     "react-dom": "latest",
+    "react-markdown": "^10.1.0",
     "react-plotly.js": "^4.0.0",
     "recharts": "latest",
+    "remark-gfm": "^4.0.1",
     "vite": "latest"
   }
 }

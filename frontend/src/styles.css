@@ -954,7 +954,142 @@ label {
   background: #fbfdfb;
   color: #21342e;
   line-height: 1.68;
-  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.literature-report > :first-child {
+  margin-top: 0;
+}
+
+.literature-report > :last-child {
+  margin-bottom: 0;
+}
+
+.literature-report h1,
+.literature-report h2,
+.literature-report h3,
+.literature-report h4 {
+  margin: 1.5em 0 0.6em;
+  color: #14231f;
+  line-height: 1.35;
+}
+
+.literature-report h1 {
+  border-bottom: 1px solid #d7e1dc;
+  padding-bottom: 0.45rem;
+  font-size: 1.35rem;
+}
+
+.literature-report h2 {
+  border-bottom: 1px solid #e4ebe7;
+  padding-bottom: 0.35rem;
+  font-size: 1.18rem;
+}
+
+.literature-report h3 {
+  font-size: 1.04rem;
+}
+
+.literature-report h4 {
+  font-size: 0.96rem;
+}
+
+.literature-report p,
+.literature-report ul,
+.literature-report ol,
+.literature-report blockquote,
+.literature-report pre,
+.literature-table-shell {
+  margin: 0.75rem 0;
+}
+
+.literature-report ul,
+.literature-report ol {
+  padding-left: 1.5rem;
+}
+
+.literature-report li + li {
+  margin-top: 0.28rem;
+}
+
+.literature-report li > p {
+  margin: 0.25rem 0;
+}
+
+.literature-report blockquote {
+  border-left: 3px solid #78a996;
+  padding: 0.1rem 0 0.1rem 0.85rem;
+  color: #526b62;
+}
+
+.literature-report a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  color: #246b55;
+  font-weight: 600;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+
+.literature-report code {
+  border-radius: 4px;
+  padding: 0.12rem 0.32rem;
+  background: #eaf1ed;
+  color: #24483b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+.literature-report pre {
+  overflow-x: auto;
+  border-radius: 7px;
+  padding: 0.8rem;
+  background: #172720;
+  color: #edf6f1;
+}
+
+.literature-report pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.literature-report hr {
+  margin: 1.25rem 0;
+  border: 0;
+  border-top: 1px solid #d7e1dc;
+}
+
+.literature-table-shell {
+  overflow-x: auto;
+  border: 1px solid #d7e1dc;
+  border-radius: 7px;
+}
+
+.literature-report table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.literature-report th,
+.literature-report td {
+  min-width: 8rem;
+  border-bottom: 1px solid #e1e8e4;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.literature-report th {
+  background: #edf5f1;
+  color: #294c40;
+  font-weight: 700;
+}
+
+.literature-report tr:last-child td {
+  border-bottom: 0;
 }
 
 .literature-result {
