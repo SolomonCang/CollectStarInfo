@@ -1,0 +1,28 @@
+[Unit]
+Description=CollectStarInfo astronomy research workspace
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+WorkingDirectory=@ROOT@
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Environment=PERSISTENCE_BACKEND=sqlite-warehouse
+Environment=COOKIE_SECURE=true
+Environment=DEEPSEEK_API_KEY_FILE=@ROOT@/DSAPI.key
+Environment=DEEPSEEK_RATE_LIMIT_DB=@ROOT@/data/deepseek-rate-limit.db
+Environment=XDG_CACHE_HOME=@ROOT@/data/cache
+ExecStart=@ROOT@/.venv/bin/python -m uvicorn backend.app.portal:app --host 127.0.0.1 --port 8780 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

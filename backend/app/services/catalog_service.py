@@ -90,7 +90,7 @@ def _scan_target_results() -> Iterator[dict[str, Any]]:
             "type": "target_result",
             "display_name": display_name,
             "source": ", ".join(sources) if sources else "SIMBAD+Gaia",
-            "file_path": str(path.relative_to(PROJECT_ROOT)),
+            "file_path": _catalog_file_path(path),
             "size_bytes": size,
             "created_at": created_at,
             "tags": tags,
@@ -107,6 +107,16 @@ def _scan_target_results() -> Iterator[dict[str, Any]]:
                 target.get("query_target") or display_name,
             },
         }
+
+
+def _catalog_file_path(path: Path) -> str:
+    """Normalize aliases before storing project-relative or external warehouse paths."""
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(PROJECT_ROOT.resolve()))
+    except ValueError:
+        # WAREHOUSE_ROOT may intentionally live on another filesystem.
+        return str(resolved)
 
 
 def _file_hash(path: str) -> str:
@@ -237,7 +247,7 @@ def _scan_lightcurve_files() -> Iterator[dict[str, Any]]:
                 mission = _guess_mission_from_path(fits_path)
                 fits_meta = _read_fits_metadata(fits_path)
 
-                rel_path = str(fits_path.relative_to(PROJECT_ROOT))
+                rel_path = _catalog_file_path(fits_path)
 
                 yield {
                     "id": f"fits_{_file_hash(rel_path)}",
@@ -296,7 +306,7 @@ def _scan_lightcurve_files() -> Iterator[dict[str, Any]]:
                 except Exception:
                     pass
 
-                rel_path = str(csv_path.relative_to(PROJECT_ROOT))
+                rel_path = _catalog_file_path(csv_path)
 
                 yield {
                     "id": f"csv_{_file_hash(rel_path)}",

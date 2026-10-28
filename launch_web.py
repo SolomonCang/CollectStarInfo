@@ -62,12 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
         description=
         "Start the Target Info Search backend and frontend, then open the web UI."
     )
-    parser.add_argument("--docker",
-                        action="store_true",
-                        help="Use Docker Compose instead of local dev mode")
-    parser.add_argument("--backend-host", default="0.0.0.0")
+    parser.add_argument("--backend-host", default="127.0.0.1")
     parser.add_argument("--backend-port", type=int, default=8000)
-    parser.add_argument("--frontend-host", default="0.0.0.0")
+    parser.add_argument("--frontend-host", default="127.0.0.1")
     parser.add_argument("--frontend-port", type=int, default=5173)
     parser.add_argument("--no-open",
                         action="store_true",
@@ -147,121 +144,12 @@ def maybe_install_frontend(npm: str, install_frontend: bool) -> None:
     node_modules = FRONTEND_DIR / "node_modules"
     if node_modules.exists() and not install_frontend:
         return
-    print("[frontend] installing dependencies with npm install")
-    subprocess.run([npm, "install"], cwd=str(FRONTEND_DIR), check=True)
-
-
-def stop_docker_services() -> None:
-    """关闭已有的 Docker Compose 服务，释放端口"""
-    compose_file = ROOT / "docker-compose.yml"
-    if not compose_file.exists():
-        return
-    docker = shutil.which("docker")
-    if docker is None:
-        return
-    # 检查是否有运行的容器
-    result = subprocess.run(
-        [docker, "compose", "-f",
-         str(compose_file), "ps", "-q"],
-        cwd=str(ROOT),
-        capture_output=True,
-        text=True)
-    if result.stdout.strip():
-        print("[docker] stopping existing services ...")
-        subprocess.run([docker, "compose", "-f",
-                        str(compose_file), "down"],
-                       cwd=str(ROOT),
-                       check=False)
-        print("[docker] previous services stopped")
-
-
-def kill_port_process(port: int) -> None:
-    """强制释放指定端口（杀掉占用进程）"""
-    import platform
-    system = platform.system()
-    try:
-        if system == "Darwin" or system == "Linux":
-            result = subprocess.run(
-                ["lsof", "-ti", f":{port}"],
-                capture_output=True, text=True, timeout=5
-            )
-            pids = result.stdout.strip().split()
-            for pid in pids:
-                try:
-                    os.kill(int(pid), signal.SIGKILL)
-                    print(f"[port] killed pid {pid} on port {port}")
-                except (ProcessLookupError, PermissionError):
-                    pass
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-
-
-def run_docker_mode(port: int, open_browser: bool) -> int:
-    """Docker Compose 模式：构建镜像、启动容器、等待就绪"""
-    docker = require_executable("docker")
-    compose_file = ROOT / "docker-compose.yml"
-
-    # 1. 先停止旧服务
-    stop_docker_services()
-
-    # 2. 如果前端未构建，先构建
-    dist_dir = FRONTEND_DIR / "dist"
-    if not dist_dir.exists():
-        print("[docker] building frontend ...")
-        npm = require_executable("npm")
-        subprocess.run([npm, "run", "build"],
-                       cwd=str(FRONTEND_DIR),
-                       check=True)
-
-    # 3. 构建并启动
-    print("[docker] building image ...")
-    subprocess.run([docker, "compose", "-f",
-                    str(compose_file), "build"],
-                   cwd=str(ROOT),
-                   check=True)
-
-    print("[docker] starting container ...")
-    subprocess.run([docker, "compose", "-f",
-                    str(compose_file), "up", "-d"],
-                   cwd=str(ROOT),
-                   check=True)
-
-    # 4. 等待就绪
-    backend_url = f"http://127.0.0.1:{port}"
-    wait_for_url(f"{backend_url}/api/health", "docker")
-
-    print(f"[docker] open: {backend_url}")
-    if open_browser:
-        webbrowser.open(backend_url)
-
-    print(
-        "[docker] service is running. Press Ctrl+C to stop (container stays in background)."
-    )
-    print(f"[docker] 手动停止: docker compose down")
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\n[docker] container is still running in background.")
-        print(f"[docker] 手动停止: cd {ROOT} && docker compose down")
-        return 0
-
-    return 0
+    print("[frontend] installing dependencies with npm ci")
+    subprocess.run([npm, "ci"], cwd=str(FRONTEND_DIR), check=True)
 
 
 def main() -> int:
     args = build_parser().parse_args()
-
-    # ---- 启动前先释放端口 ----
-    stop_docker_services()
-    kill_port_process(args.backend_port)
-    kill_port_process(args.frontend_port)
-
-    # ---- Docker 模式 ----
-    if args.docker:
-        open_browser = not args.no_open
-        return run_docker_mode(args.backend_port, open_browser)
 
     # ---- 本地开发模式 ----
     npm = require_executable("npm")

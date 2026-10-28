@@ -1,5 +1,15 @@
 # CollectStarInfo
 
+## 项目接入与文档导航
+
+本项目已于 2026-10-28 移入 BJPcloudServer 工作区，保留独立 Git 仓库。它负责 SIMBAD/Gaia/MAST 信息检索、文献调研及 MAST 光变数据分析，与同级 DREAMSCloud 下载库和 PubSci_VarStar 业务数据库分别维护。
+
+- [工作指南](AGENTS.md)：开发、验证、数据和生产边界。
+- [当前架构](docs/interactive_architecture.md)：代码分层、账号、持久化和 API。
+- [部署与运行核验](docs/DEPLOYMENT.md)：原生服务、GitHub 更新流程、门户入口、迁移验收及未验证项。
+
+线上入口为科研门户的 [恒星信息工作台](https://123.59.0.92:30001/apps/stars/)，后端仅映射 5 号机 `127.0.0.1:8780`。生产由 `collectstarinfo.service` 直接运行 Python 虚拟环境，门户适配、systemd 模板和更新脚本均纳入本仓库。发布方式为先推送 GitHub，再在服务器执行 `sudo /home/cang_tq/CollectStarInfo/scripts/update-server.sh`。本项目已移除 Docker 部署文件及启动分支。
+
 ## 中文使用说明
 
 这是一个用于检索恒星/天体信息的工具，会整合 SIMBAD、Gaia DR3、MAST 等数据源，并输出结构化报告。交互式 Web 工作台采用本地账号、SQLite 目录数据库和 `warehouse/` 文件层；可查询目标、通过用户私有的 OpenAI 兼容接口完成总结和文献调研，从 MAST 检索/下载 TESS、Kepler、K2 光变曲线产品，并对本地光变曲线做去趋势、周期搜索和相位折叠。
@@ -24,7 +34,7 @@
 
 ## Web 工作台
 
-首次运行先创建管理员（公开注册默认关闭）：
+独立开发环境首次运行先创建管理员（没有公开注册入口；线上门户模式使用独立身份适配，不执行此初始化）：
 
 ```bash
 .venv/bin/python -m backend.app.manage create-admin --username admin
@@ -38,15 +48,17 @@
 .venv/bin/uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+启动会初始化/升级开发目录数据库并重建兼容目录。启动目录已统一到项目根目录，不再在上级创建 `results/`；使用独立开发配置与数据。
+
 前端：
 
 ```bash
 cd frontend
-npm install
-npm run dev
+npm ci
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-前端默认连接 `http://127.0.0.1:8000`。工作台包含“恒星主页”“数据发现与入库”“光变实验室”“插件中心”和“数据管理”；管理员额外看到“用户管理”。目标快照和光变数据在用户间共享，模型配置、API Key、提示输入和 AI 历史只对其所有者可见。普通用户可查询、刷新、下载和分析，但删除共享数据、缓存清理和目录重建只允许管理员执行。
+访问 `http://127.0.0.1:5173/`；前端默认发起同源 `/api` 请求，Vite 将其代理到 `http://localhost:8000`。需要跨源访问时使用 `VITE_API_BASE` 并核对 Cookie/CORS 配置。工作台包含“恒星主页”“数据发现与入库”“光变实验室”“插件中心”和“数据管理”；管理员额外看到“用户管理”。目标快照和光变数据在用户间共享，模型配置、API Key、提示输入和 AI 历史只对其所有者可见。普通用户可查询、刷新、下载和分析，但删除共享数据、缓存清理和目录重建只允许管理员执行。
 
 ### 默认 SQLite + warehouse 存储
 
@@ -63,13 +75,15 @@ warehouse/
   secrets/master.key
 ```
 
-本地首次需要加密模型密钥时会原子生成权限为 `0600` 的 `warehouse/secrets/master.key`。服务器和容器部署应改用 `APP_MASTER_KEY` 注入 32 字节密钥，例如：
+本地首次需要加密模型密钥时会原子生成权限为 `0600` 的 `warehouse/secrets/master.key`。新部署也可使用 `APP_MASTER_KEY` 注入 32 字节密钥，例如：
 
 ```bash
 python -c 'import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())'
 ```
 
-API Key 使用 AES-GCM 加密，接口、日志和管理页面都不会返回明文。会话使用数据库中的不透明令牌、HttpOnly/SameSite Cookie，并对所有写请求校验 CSRF Token。
+API Key 使用 AES-GCM 加密，接口、日志和管理页面都不会返回明文。会话使用数据库中的不透明令牌、HttpOnly/SameSite Cookie，并对已登录业务的写请求校验 CSRF Token。
+
+上述会话描述适用于独立账号模式，登录请求本身不要求已有 CSRF Token；线上身份由 `backend/app/portal.py` 提供。现有 SQLite 生产部署保留同一持久化主密钥文件，不能直接切换成新生成的 `APP_MASTER_KEY`，否则已有模型密钥可能无法解密。备份与恢复必须保留匹配的主密钥。
 
 ### 迁移现有数据
 
@@ -83,44 +97,16 @@ API Key 使用 AES-GCM 加密，接口、日志和管理页面都不会返回明
 
 复制使用临时文件、原子重命名和 SHA-256 校验，并按目标、产品 URI 与内容哈希去重。命令可安全重复执行；冲突记录到报告而不会静默覆盖。管理员页面只读展示迁移状态，迁移本身只能通过 CLI 发起。
 
+注意：`--dry-run` 仍会初始化工作台数据库、写迁移台账和报告；`--verify` 执行前也会初始化工作台数据库。这些命令不属于线上只读检查，需在明确的目标环境和迁移授权下使用。
+
 ### PostgreSQL + MinIO/S3 分离式存储
 
 生产环境可以设置 `PERSISTENCE_BACKEND=postgres-s3`：账号、工作台目录及对象索引使用同一套关系模型，PostgreSQL 作为权威元数据源，MinIO 或兼容 S3 的服务保存 JSON、FITS、CSV 等对象。旧 PostgreSQL/S3 表和对象镜像继续兼容，业务接口不需要判断具体存储后端。
 
-本机启动完整环境：
+该模式可连接独立运行的 PostgreSQL 和 S3/MinIO，当前生产仍使用 SQLite。配置变量示例见 `deploy/storage.env.example`，需通过受控环境变量或服务 drop-in 注入，示例文件不会自动加载。后端原生运行，不再提供容器编排。
 
-```bash
-cp .env.storage.example .env.storage
-# 先修改 .env.storage 中的两个密码
-docker compose --env-file .env.storage \
-  -f docker-compose.storage.yml up -d --build
-```
-
-- Web/API：`http://127.0.0.1:8000`
-- MinIO API：`http://127.0.0.1:9000`
-- MinIO 控制台：`http://127.0.0.1:9001`
-- `/api/health` 会分别报告应用和持久化后端状态。
-
-如果宿主机的 `8000` 端口已占用，可在 `.env.storage` 中设置
-`TARGET_INFO_PORT=18000`，然后通过 `http://127.0.0.1:18000` 访问。
-
-连接已有的独立服务器时，只需给 API 容器设置：
-
-```bash
-PERSISTENCE_BACKEND=postgres-s3
-DATABASE_URL=postgresql+psycopg://user:password@postgres.example:5432/target_info
-S3_ENDPOINT_URL=https://minio.example
-S3_ACCESS_KEY=...
-S3_SECRET_KEY=...
-S3_BUCKET=target-info-search
-S3_REGION=us-east-1
-S3_CREATE_BUCKET=false
-APP_MASTER_KEY=<base64-url-encoded-32-byte-key>
-```
-
-AWS S3 可省略 `S3_ENDPOINT_URL`。生产环境应通过 Docker secret、Kubernetes Secret 或密钥管理服务
-注入密码，不要提交真实 `.env.storage`。多个 API 实例之间通过 PostgreSQL advisory lock 协调数据集
-写入，不再依赖跨服务器文件锁。
+AWS S3 可省略 `S3_ENDPOINT_URL`。生产环境应通过受控服务配置或密钥管理服务
+注入密码，不要提交真实 `.env.storage`。可选 PostgreSQL 模式通过 advisory lock 协调跨实例的数据集写入；本地文件访问仍受目录和文件锁约束。
 
 已有本地数据可无损复制到远端（脚本不会删除本地文件）：
 
@@ -138,9 +124,11 @@ python scripts/migrate_to_postgres_s3.py
 
 应用启动时会自动创建所需表；需要由 DBA 预建表时，依次执行 `migrations/001_postgres_s3.sql` 和 `migrations/002_workspace.sql`。数据库记录和对象上传均为幂等 upsert，迁移脚本可以安全重跑。
 
+`migrate_to_postgres_s3.py --dry-run` 也会先调用持久化初始化，可能建表或创建 bucket；不能用它证明远端“无写入”。原生工作台启动还包含兼容结构升级，不应将两个 SQL 文件视为完整、独立的版本化迁移链路。
+
 目标查询默认优先载入 SQLite 目录中的最新快照，迁移前也会兼容读取 `results/<target>.json`；“强制重新检索”会重新调用 SIMBAD/Gaia/MAST 并保存新的共享快照。LLM 失败不会影响科学检索结果，其总结作为当前用户的独立运行记录保存。
 
-MAST 光变曲线使用三层缓存。用户可见的数据集写入：
+MAST 光变曲线按搜索、产品、派生数组和分析结果分层缓存。用户可见的数据集写入：
 
 ```text
 warehouse/objects/lightcurves/<target>/<timestamp>-<uuid>/
@@ -174,20 +162,29 @@ SIMBAD 默认连接/读取超时为 10/20 秒，MAST 为 10/90 秒；MAST 遇到
 - `POST /api/lightcurves/cache/cleanup`
 - `POST /api/lightcurves/datasets/delete`
 
-也可以在项目根目录用启动器一次性启动前后端并打开网页：
-
-```bash
-python launch_web.py
-```
-
-如需只启动不打开浏览器：
+也可以在项目根目录一次启动两个开发进程：
 
 ```bash
 python launch_web.py --no-open
+# 或 ./start.sh --no-open
 ```
+
+启动器默认只绑定回环地址，不再停止容器或杀死占用端口的现有进程。端口已占用时先自行确认运行中的服务；仅清理由本次启动创建的子进程。
 
 提示：如果只想跑单个目标，可用 `--targets "Proxima Centauri"` 直接传参。
 也可以直接传坐标，例如 `python run_agent.py --targets "14:29:42.95 -62:40:46.2" --no-llm`。
+
+## 本地验证
+
+使用独立开发环境，不指向线上数据库、warehouse 或密钥。在项目根目录执行：
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+在 `frontend/` 执行 `npm ci`、`npm test`、`npm run build`。仓库目前没有 `.github/workflows/` CI/CD 配置，也没有前端 lint 脚本；提交或推送不等于已完成生产发布。2026-10-28 的检查结果见[部署核验](docs/DEPLOYMENT.md#本地检查与未验证项)。
+
+路径别名已在目录扫描时规范化；现有测试及新增的启动目录、符号链接、门户映射和限流测试在 macOS 默认临时目录下通过。也可用 `PYTHON_BIN=/path/to/python bash scripts/verify.sh` 在临时源码副本中验证，避免读取生产数据和密钥。
 
 ## 在 Copilot 中使用参数提取技能
 
@@ -271,7 +268,7 @@ python run_agent.py --config config.yaml --targets "Proxima Centauri"
 
 Run with target file:
 
-python run_agent.py --targets-file targets_example.txt
+python run_agent.py --targets-file targets_input.txt
 
 Disable LLM summary:
 
@@ -283,16 +280,17 @@ python run_agent.py --targets "Proxima Centauri" --use-llm
 
 Custom output options:
 
-python run_agent.py --targets-file targets_example.txt --format both --output-dir results
+python run_agent.py --targets-file targets_input.txt --format both --output-dir results
 
 Customize MAST regional search radius:
 
-python run_agent.py --targets-file targets_example.txt --mast-radius-deg 0.05
+python run_agent.py --targets-file targets_input.txt --mast-radius-deg 0.05
 
 ## Output
-Generated files are placed in results/ with timestamp suffix:
-- target_report_YYYYMMDD_HHMMSS.json
-- target_report_YYYYMMDD_HHMMSS.md
+CLI files are placed in `results/` using sanitized target names, for example
+`Proxima Centauri.json` and `Proxima Centauri.md`. Repeating the same target
+can overwrite its CLI report. Web snapshots are indexed separately in the
+workspace database and stored under `warehouse/objects/targets/`.
 
 ## Notes
 - Gaia query first tries Gaia source id extracted from SIMBAD identifiers.

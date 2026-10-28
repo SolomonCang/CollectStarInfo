@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from backend.app.services import catalog_service
 
@@ -43,10 +44,9 @@ class CatalogServiceTestCase(unittest.TestCase):
                 catalog_service.DATA_ROOT = tmp_path / "data" / "lightcurves"
                 catalog_service.RESULTS_DIR = results_dir
                 catalog_service.CATALOG_PATH = tmp_path / "catalog.json"
-                catalog_service.persistence.upsert_catalog = lambda entries: None
-                catalog_service.workspace.catalog_entries = lambda: []
-
-                catalog = catalog_service._rebuild_catalog()
+                with patch.object(catalog_service.persistence, "upsert_catalog"), \
+                     patch.object(catalog_service.workspace, "catalog_entries", return_value=[]):
+                    catalog = catalog_service._rebuild_catalog()
                 entries = catalog["entries"]
 
                 self.assertTrue(any(entry["type"] == "target_result" and entry["display_name"] == "AD Leo" for entry in entries))

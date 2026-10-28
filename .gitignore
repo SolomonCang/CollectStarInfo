@@ -1,8 +1,8 @@
 # Environment and secrets
 .env
-.env.storage
+.env.*
+!.env.example
 .venv/
-.gitignore
 
 # Python cache/build artifacts
 __pycache__/
@@ -24,9 +24,6 @@ results/
 data/
 warehouse/
 *.log
-
-# Docker wheels (offline packages)
-docker-wheels/
 
 # OS/editor local files
 .DS_Store

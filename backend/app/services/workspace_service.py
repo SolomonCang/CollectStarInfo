@@ -111,7 +111,7 @@ def _database_url() -> str:
 
 
 def _default_deepseek_api_key() -> str:
-    key_file = os.getenv("DEEPSEEK_API_KEY_FILE", "/app/DSAPI.key").strip()
+    key_file = os.getenv("DEEPSEEK_API_KEY_FILE", str(PROJECT_ROOT / "DSAPI.key")).strip()
     if key_file:
         try:
             value = Path(key_file).read_text(encoding="utf-8").strip()

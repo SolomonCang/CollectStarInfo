@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .paths import PROJECT_ROOT
 from .http_timeouts import install_service_timeouts
 
 install_service_timeouts()
@@ -100,10 +101,8 @@ catalog_service = CatalogService()
 @app.on_event("startup")
 async def _ensure_data_dirs() -> None:
     """Ensure data/ directories exist on first launch (not synced via git)."""
-    from pathlib import Path
-    project_root = Path(__file__).resolve().parents[3]
     (WAREHOUSE_ROOT / "objects" / "lightcurves").mkdir(parents=True, exist_ok=True)
-    (project_root / "results").mkdir(parents=True, exist_ok=True)
+    (PROJECT_ROOT / "results").mkdir(parents=True, exist_ok=True)
     workspace.initialize()
     persistence.initialize()
     # Rebuild catalog if missing (e.g. fresh clone)
@@ -292,7 +291,7 @@ def catalog_rebuild(_: SessionIdentity = Depends(require_admin)) -> dict:
     return catalog_service.rebuild()
 
 
-# ---- 静态文件服务：Docker 部署时提供前端 SPA ----
+# ---- 静态文件服务：原生部署时提供前端 SPA ----
 _frontend_dist = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
 if os.path.isdir(_frontend_dist):
