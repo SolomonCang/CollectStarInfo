@@ -4,7 +4,7 @@ set -euo pipefail
 [[ $# -eq 0 || ( $# -eq 1 && $1 == --no-pull ) ]] || {
   echo "Usage: update-server.sh [--no-pull]" >&2; exit 1;
 }
-repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
 app_user=${COLLECTSTARINFO_USER:-cang_tq}
 exec 9>/run/lock/collectstarinfo-update.lock
 flock -n 9 || { echo "Another CollectStarInfo update is running." >&2; exit 1; }

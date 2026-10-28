@@ -56,6 +56,8 @@ ssh ComputerCenter-05-DepResearch02-root /home/cang_tq/CollectStarInfo/scripts/u
 4. 在临时源码副本中运行后端测试，再运行前端测试，按 `/apps/stars/` 构建静态资源。
 5. 安装仓库内的 systemd 模板、重启应用，并核验 HTTP 与健康 JSON 的顶层、storage、workspace 三处状态。
 
+安装时同时把旧 `/usr/local/sbin/update-collectstarinfo` 替换为指向仓库脚本的符号链接，保留原管理入口，不再维护仓库外的脚本副本。更新脚本会解析该链接以定位真实源码目录。
+
 GitHub 推送本身不会触发自动部署。`--no-pull` 仅供已核对源码的初次安装或受控操作使用，正常发布不要使用它跳过 Git 检查。脚本失败不会被报告为发布成功；Git 更新、依赖安装及构建不是原子发布，运行中的 Python 进程可能已加载部分模块，因此构建失败后也应排查现场。脚本没有自动回滚或数据备份功能。
 
 ## 首次准备或重建运行环境
